@@ -1,0 +1,20 @@
+{
+  "info": {
+    "name": "HustleHub Part 1",
+    "description": "Registration, login, JWT-protected route, and negative/edge-case tests for HustleHub Part 1.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://localhost:5000" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 - Health Check",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/health"
+      }
+    }
+  ]
+}
