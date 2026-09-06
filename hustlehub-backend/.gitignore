@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# SSL certificates
+certs/*.pem
+
+# Logs
+logs/*.log
+
+# Runtime data
+data/users.json
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
