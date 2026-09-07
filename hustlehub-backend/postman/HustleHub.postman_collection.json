@@ -227,6 +227,24 @@
         "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
         "url": "{{baseUrl}}/api/auth/profile"
       }
+    },
+    {
+      "name": "12 - Protected Profile - Invalid Token (401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 401', function () { pm.response.to.have.status(401); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer garbage.token.value" }],
+        "url": "{{baseUrl}}/api/auth/profile"
+      }
     }
   ]
 }
