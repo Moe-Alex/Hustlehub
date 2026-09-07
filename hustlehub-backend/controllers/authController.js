@@ -32,7 +32,7 @@ async function registerUser(req, res, next) {
       return res.status(409).json({ success: false, message: 'That username is already taken.' });
     }
 
-    // Never store plain-text passwords.
+    // Never store plain text passwords.
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
     const newUser = userModel.createUser({ username, email, hashedPassword, role });
 
@@ -54,8 +54,7 @@ async function loginUser(req, res, next) {
     const { email, password } = req.body;
     const user = userModel.findByEmail(email);
 
-    // Same generic message for "no such user" and "wrong password" -
-    // stops attackers figuring out which emails are registered.
+    // Same generic message for "no such user" and "wrong password" - stops attackers figuring out which emails are registered.
     const invalidCredentials = () =>
       res.status(401).json({ success: false, message: 'Invalid email or password.' });
 
