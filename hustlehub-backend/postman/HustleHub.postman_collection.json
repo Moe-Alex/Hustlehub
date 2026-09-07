@@ -60,6 +60,28 @@
         },
         "url": "{{baseUrl}}/api/auth/register"
       }
+    },
+    {
+      "name": "04 - Register - Weak Password (400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 400', function () { pm.response.to.have.status(400); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"Moe_Weak\",\n  \"email\": \"Moegammad+weak@gmail.com\",\n  \"password\": \"12345\",\n  \"role\": \"freelancer\"\n}"
+        },
+        "url": "{{baseUrl}}/api/auth/register"
+      }
     }
   ]
 }
