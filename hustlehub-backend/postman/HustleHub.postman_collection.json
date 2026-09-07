@@ -245,6 +245,24 @@
         "header": [{ "key": "Authorization", "value": "Bearer garbage.token.value" }],
         "url": "{{baseUrl}}/api/auth/profile"
       }
+    },
+    {
+      "name": "13 - Unknown Route (404, no stack trace)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 404', function () { pm.response.to.have.status(404); });",
+              "pm.test('No stack trace leaked', function () { pm.expect(pm.response.text()).to.not.include('at '); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/nonexistent"
+      }
     }
   ]
 }
