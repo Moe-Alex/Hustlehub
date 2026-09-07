@@ -123,6 +123,53 @@
         "body": { "mode": "raw", "raw": "{\n  \"email\": \"Moegammad@gmail.com\"\n}" },
         "url": "{{baseUrl}}/api/auth/register"
       }
+    },
+    {
+      "name": "07 - Login - Success (saves token)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.test('Token present', function () { pm.expect(json.data.token).to.exist; });",
+              "if (json.data && json.data.token) { pm.collectionVariables.set('token', json.data.token); }"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"Moegammad@gmail.com\",\n  \"password\": \"Moe_Password22!\"\n}"
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "08 - Login - Wrong Password (401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 401', function () { pm.response.to.have.status(401); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"Moegammad@gmail.com\",\n  \"password\": \"WrongPassword1!\"\n}"
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
     }
   ]
 }
