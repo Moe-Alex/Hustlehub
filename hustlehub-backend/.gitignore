@@ -10,8 +10,9 @@ certs/*.pem
 # Logs
 logs/*.log
 
-# Runtime data
-data/users.json
+# Generated Newman test reports
+newman/reports/*
+!newman/reports/.gitkeep
 
 # OS / editor files
 .DS_Store
