@@ -1,22 +1,28 @@
-// Configures the Express app (middleware + routes). Kept separate from server.js so it could be imported by automated tests later without needing a real running server.
+// Configures the Express app (middleware + routes). Kept separate from server.js so it can be imported without starting a server.
 
 const express = require('express');
-const helmet = require('helmet');
-const cors = require('cors');
 const morgan = require('morgan');
 
 const authRoutes = require('./routes/authRoutes');
+const gigRoutes = require('./routes/gigRoutes');
+const bookingRoutes = require('./routes/bookingRoutes');
+const transactionRoutes = require('./routes/transactionRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const { helmetMiddleware, extraHeaders, corsMiddleware } = require('./middleware/securityHeaders');
+const { sanitizeRequest } = require('./middleware/sanitizeMiddleware');
+const { generalLimiter } = require('./middleware/rateLimiters');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 const config = require('./config/config');
 
 const app = express();
 
-app.use(helmet()); // secure HTTP headers
-app.use(cors());
+app.use(helmetMiddleware); // secure HTTP headers + Content Security Policy
+app.use(extraHeaders);
+app.use(corsMiddleware); // only the frontend origins may call the API from a browser
 
-// Body parsing, capped to reduce large-payload abuse.
+// The API only accepts JSON, capped at 10kb to reduce large-payload abuse.
 app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(sanitizeRequest); // strips NoSQL operators and HTML from body and query
 
 if (config.nodeEnv !== 'test') {
   app.use(morgan('dev')); // HTTP request logging
@@ -27,7 +33,13 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ success: true, message: 'HustleHub+ API is running.' });
 });
 
+app.use('/api', generalLimiter);
+
 app.use('/api/auth', authRoutes);
+app.use('/api/gigs', gigRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 + centralised error handling - must be registered last.
 app.use(notFound);
