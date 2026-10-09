@@ -3025,6 +3025,164 @@
           }
         }
       ]
+    },
+    {
+      "name": "08 - Error handling and CORS",
+      "description": "Errors are safe and informative. Only the frontend origin may call from a browser.",
+      "item": [
+        {
+          "name": "Unknown route (404, no leaks)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));",
+                  "pm.test('No stack trace or file path leaked', () => { const t = pm.response.text(); pm.expect(t).to.not.match(/\\bat \\S+ \\(|node_modules|\\.js:\\d+|C:\\\\\\\\|\\/home\\//i); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/does-not-exist"
+          }
+        },
+        {
+          "name": "Malformed JSON (400, no leaks)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));",
+                  "pm.test('Message is safe and informative', () => pm.expect(pm.response.json().message).to.match(/malformed/i));",
+                  "pm.test('No stack trace or file path leaked', () => { const t = pm.response.text(); pm.expect(t).to.not.match(/\\bat \\S+ \\(|node_modules|\\.js:\\d+|C:\\\\\\\\|\\/home\\//i); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": ",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Oversized body (413)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('bigBody', JSON.stringify({ email: 'a@b.co', password: 'x'.repeat(12000) }));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 413', () => pm.response.to.have.status(413));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));",
+                  "pm.test('No stack trace or file path leaked', () => { const t = pm.response.text(); pm.expect(t).to.not.match(/\\bat \\S+ \\(|node_modules|\\.js:\\d+|C:\\\\\\\\|\\/home\\//i); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{bigBody}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Foreign origin is refused (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));",
+                  "pm.test('Message is safe and informative', () => pm.expect(pm.response.json().message).to.match(/origin not allowed/i));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "https://evil.example"
+              }
+            ],
+            "url": "{{baseUrl}}/api/health"
+          }
+        },
+        {
+          "name": "Frontend origin is allowed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('CORS header echoes the frontend origin', () => pm.expect(pm.response.headers.get('Access-Control-Allow-Origin')).to.eql('https://localhost:5173'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "https://localhost:5173"
+              }
+            ],
+            "url": "{{baseUrl}}/api/health"
+          }
+        }
+      ]
     }
   ]
 }
