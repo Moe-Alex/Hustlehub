@@ -2202,6 +2202,241 @@
           }
         }
       ]
+    },
+    {
+      "name": "04 - Transactions and income tracking",
+      "description": "Payments are visible to their parties; income is tracked per freelancer.",
+      "item": [
+        {
+          "name": "Client A sees the payment (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Payment reference is listed', () => pm.expect(pm.response.json().data.map(t => t.reference)).to.include(pm.collectionVariables.get('txnRef')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{claToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions"
+          }
+        },
+        {
+          "name": "Freelancer A sees the earning (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Earning is listed', () => pm.expect(pm.response.json().data.map(t => t.reference)).to.include(pm.collectionVariables.get('txnRef')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions"
+          }
+        },
+        {
+          "name": "Client B sees no payments (200, empty)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Another user\\'s payment is hidden', () => pm.expect(pm.response.json().data.map(t => t.reference)).to.not.include(pm.collectionVariables.get('txnRef')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{clbToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions"
+          }
+        },
+        {
+          "name": "Admin sees all transactions (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions"
+          }
+        },
+        {
+          "name": "Transactions without token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/transactions"
+          }
+        },
+        {
+          "name": "Freelancer A income summary (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "const d = pm.response.json().data; const price = pm.collectionVariables.get('gigPrice'); const r2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;",
+                  "pm.test('Total income equals the booked gig price', () => pm.expect(d.totalIncome).to.eql(price));",
+                  "pm.test('Estimated tax = income x rate', () => pm.expect(d.estimatedTax).to.eql(r2(d.totalIncome * d.estimatedTaxRate)));",
+                  "pm.test('Net income = income - tax', () => pm.expect(d.netIncome).to.eql(r2(d.totalIncome - d.estimatedTax)));",
+                  "pm.test('Breakdown by gig is included', () => { pm.expect(d.byGig).to.have.lengthOf(1); pm.expect(d.byGig[0].income).to.eql(price); pm.expect(d.byGig[0].bookings).to.eql(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions/income"
+          }
+        },
+        {
+          "name": "Freelancer B income is zero (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Income is 0', () => pm.expect(pm.response.json().data.totalIncome).to.eql(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flbToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions/income"
+          }
+        },
+        {
+          "name": "Client cannot view income (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{claToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions/income"
+          }
+        },
+        {
+          "name": "Admin cannot view freelancer income (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions/income"
+          }
+        }
+      ]
     }
   ]
 }
