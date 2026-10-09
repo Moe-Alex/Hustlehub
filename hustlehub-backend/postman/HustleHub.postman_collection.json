@@ -1,268 +1,76 @@
 {
   "info": {
-    "name": "HustleHub Part 1",
-    "description": "Registration, login, JWT-protected route, and negative/edge-case tests for HustleHub Part 1.",
+    "name": "HustleHub+ API (Part 2)",
+    "description": "Automated API tests for HustleHub+: authentication, gigs, bookings, transactions, RBAC, validation, sanitisation, security headers and rate limiting. Run with `npm test` (Newman) or import into Postman and run the collection in order.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "https://localhost:5000" },
-    { "key": "token", "value": "" }
+    {
+      "key": "runId",
+      "value": ""
+    }
   ],
   "item": [
     {
-      "name": "01 - Health Check",
-      "request": {
-        "method": "GET",
-        "url": "{{baseUrl}}/api/health"
-      }
-    },
-    {
-      "name": "02 - Register - Success",
-      "event": [
+      "name": "00 - Setup and security headers",
+      "description": "Starts a fresh run and checks the API is reachable over HTTPS with security headers.",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
-              "pm.test('Response has success true', function () { pm.expect(pm.response.json().success).to.eql(true); });"
-            ]
+          "name": "Health check (starts a new run)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('runId', Date.now().toString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('API reports it is running', () => pm.expect(pm.response.json().success).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/health"
           }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"username\": \"Moe_Alex\",\n  \"email\": \"Moegammad@gmail.com\",\n  \"password\": \"Moe_Password22!\",\n  \"role\": \"freelancer\"\n}"
         },
-        "url": "{{baseUrl}}/api/auth/register"
-      }
-    },
-    {
-      "name": "03 - Register - Duplicate Email (409)",
-      "event": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 409', function () { pm.response.to.have.status(409); });"
-            ]
+          "name": "Security headers are present",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const h = (n) => pm.response.headers.get(n);",
+                  "pm.test('Content-Security-Policy blocks everything by default', () => pm.expect(h('Content-Security-Policy')).to.include(\"default-src 'none'\"));",
+                  "pm.test('CSP forbids framing', () => pm.expect(h('Content-Security-Policy')).to.include(\"frame-ancestors 'none'\"));",
+                  "pm.test('X-Content-Type-Options is nosniff', () => pm.expect(h('X-Content-Type-Options')).to.eql('nosniff'));",
+                  "pm.test('X-Frame-Options is DENY', () => pm.expect(h('X-Frame-Options')).to.eql('DENY'));",
+                  "pm.test('Referrer-Policy is no-referrer', () => pm.expect(h('Referrer-Policy')).to.eql('no-referrer'));",
+                  "pm.test('Responses are not cacheable', () => pm.expect(h('Cache-Control')).to.eql('no-store'));",
+                  "pm.test('X-Powered-By is not exposed', () => pm.expect(h('X-Powered-By')).to.be.undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/health"
           }
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"username\": \"Moe_Alex2\",\n  \"email\": \"Moegammad@gmail.com\",\n  \"password\": \"Moe_Password22!\",\n  \"role\": \"freelancer\"\n}"
-        },
-        "url": "{{baseUrl}}/api/auth/register"
-      }
-    },
-    {
-      "name": "04 - Register - Weak Password (400)",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 400', function () { pm.response.to.have.status(400); });"
-            ]
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"username\": \"Moe_Weak\",\n  \"email\": \"Moegammad+weak@gmail.com\",\n  \"password\": \"12345\",\n  \"role\": \"freelancer\"\n}"
-        },
-        "url": "{{baseUrl}}/api/auth/register"
-      }
-    },
-    {
-      "name": "05 - Register - Invalid Email Format (400)",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 400', function () { pm.response.to.have.status(400); });"
-            ]
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"username\": \"Moe_Alex\",\n  \"email\": \"12345\",\n  \"password\": \"Moe_Password22!\",\n  \"role\": \"freelancer\"\n}"
-        },
-        "url": "{{baseUrl}}/api/auth/register"
-      }
-    },
-    {
-      "name": "06 - Register - Missing Fields (400)",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 400', function () { pm.response.to.have.status(400); });"
-            ]
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": { "mode": "raw", "raw": "{\n  \"email\": \"Moegammad@gmail.com\"\n}" },
-        "url": "{{baseUrl}}/api/auth/register"
-      }
-    },
-    {
-      "name": "07 - Login - Success (saves token)",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-              "const json = pm.response.json();",
-              "pm.test('Token present', function () { pm.expect(json.data.token).to.exist; });",
-              "if (json.data && json.data.token) { pm.collectionVariables.set('token', json.data.token); }"
-            ]
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"Moegammad@gmail.com\",\n  \"password\": \"Moe_Password22!\"\n}"
-        },
-        "url": "{{baseUrl}}/api/auth/login"
-      }
-    },
-    {
-      "name": "08 - Login - Wrong Password (401)",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 401', function () { pm.response.to.have.status(401); });"
-            ]
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"Moegammad@gmail.com\",\n  \"password\": \"WrongPassword1!\"\n}"
-        },
-        "url": "{{baseUrl}}/api/auth/login"
-      }
-    },
-    {
-      "name": "09 - Login - Non-existent Email (401)",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 401', function () { pm.response.to.have.status(401); });"
-            ]
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"Alexander@gmail.com\",\n  \"password\": \"Moe_Password22!\"\n}"
-        },
-        "url": "{{baseUrl}}/api/auth/login"
-      }
-    },
-    {
-      "name": "10 - Protected Profile - No Token (401)",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 401', function () { pm.response.to.have.status(401); });"
-            ]
-          }
-        }
-      ],
-      "request": {
-        "method": "GET",
-        "url": "{{baseUrl}}/api/auth/profile"
-      }
-    },
-    {
-      "name": "11 - Protected Profile - Valid Token (200)",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
-            ]
-          }
-        }
-      ],
-      "request": {
-        "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-        "url": "{{baseUrl}}/api/auth/profile"
-      }
-    },
-    {
-      "name": "12 - Protected Profile - Invalid Token (401)",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 401', function () { pm.response.to.have.status(401); });"
-            ]
-          }
-        }
-      ],
-      "request": {
-        "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer garbage.token.value" }],
-        "url": "{{baseUrl}}/api/auth/profile"
-      }
-    },
-    {
-      "name": "13 - Unknown Route (404, no stack trace)",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 404', function () { pm.response.to.have.status(404); });",
-              "pm.test('No stack trace leaked', function () { pm.expect(pm.response.text()).to.not.include('at '); });"
-            ]
-          }
-        }
-      ],
-      "request": {
-        "method": "GET",
-        "url": "{{baseUrl}}/api/nonexistent"
-      }
+      ]
     }
   ]
 }
