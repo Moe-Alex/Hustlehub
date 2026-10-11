@@ -76,7 +76,7 @@ export default function GigDetailPage() {
             <form className="booking-box" onSubmit={handleBook} noValidate>
               <h2>Book this gig</h2>
               <FormField as="textarea" id="notes" label="Notes for the freelancer (optional)" rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} error={notesError} hint={`${notes.length} of 500 characters`} />
-              <p className="booking-total">Total: <strong>{formatZAR(gig.price)}</strong>. Payment is simulated, so you will not be charged.</p>
+              <p className="booking-total">Total: <strong>{formatZAR(gig.price)}</strong>.</p>
               <button type="submit" className="btn btn-primary" disabled={submitting}>
                 {submitting ? 'Booking...' : 'Confirm booking'}
               </button>
@@ -87,7 +87,7 @@ export default function GigDetailPage() {
             <section className="booking-box booking-done" role="status">
               <h2>Booking confirmed</h2>
               <p>
-                Payment of <strong>{formatZAR(confirmation.transaction.amount)}</strong> was simulated. Your reference is{' '}
+                Your payment of <strong>{formatZAR(confirmation.transaction.amount)}</strong> was recorded. Your reference is{' '}
                 <strong>{confirmation.transaction.reference}</strong>.
               </p>
               <Link className="btn btn-primary" to="/bookings">View my bookings</Link>

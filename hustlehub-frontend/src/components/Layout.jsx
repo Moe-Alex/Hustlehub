@@ -12,7 +12,7 @@ export default function Layout() {
         <Outlet />
       </main>
       <footer className="footer">
-        <p>HustleHub+ is a learning project. Payments on this site are simulated and no real money moves.</p>
+        <p>&copy; {new Date().getFullYear()} HustleHub+. All rights reserved.</p>
       </footer>
     </>
   );

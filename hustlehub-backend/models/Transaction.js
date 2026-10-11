@@ -1,4 +1,4 @@
-// The (simulated) payment created for every booking. Freelancer income is the sum of these.
+// The payment created for every booking. Freelancer income is the sum of these.
 
 const mongoose = require('mongoose');
 

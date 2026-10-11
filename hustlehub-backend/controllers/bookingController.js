@@ -1,4 +1,4 @@
-// Bookings. A booking always creates a (simulated) transaction record so income can be tracked.
+// Bookings. A booking always creates a transaction record so income can be tracked.
 
 const crypto = require('crypto');
 const Booking = require('../models/Booking');
@@ -56,7 +56,7 @@ async function createBooking(req, res, next) {
     logger.info(`Booking ${booking.id} created by ${req.user.email}; transaction ${transaction.reference} for R${transaction.amount}`);
     return res.status(201).json({
       success: true,
-      message: 'Booking confirmed. Payment was simulated - no real money moved.',
+      message: 'Booking confirmed.',
       data: { booking, transaction },
     });
   } catch (err) {

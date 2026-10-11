@@ -8,9 +8,9 @@ import { useApi } from '../hooks/useApi';
 import { formatDate, formatZAR } from '../utils/format';
 
 const COPY = {
-  client: { title: 'Payments', intro: 'Simulated payments for the gigs you booked.' },
-  freelancer: { title: 'Earnings', intro: 'Simulated payments received for your gigs.' },
-  admin: { title: 'All transactions', intro: 'Every simulated payment on the platform.' },
+  client: { title: 'Payments', intro: 'Payments for the gigs you booked.' },
+  freelancer: { title: 'Earnings', intro: 'Payments received for your gigs.' },
+  admin: { title: 'All transactions', intro: 'Every payment on the platform.' },
 };
 
 export default function PaymentsPage() {
