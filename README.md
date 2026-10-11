@@ -244,3 +244,23 @@ sequenceDiagram
 The API only returns JSON, so its policy is: `default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`. Nothing from an API response can load a script, style, image or frame.
 
 The React app (production build) uses: `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`. Fonts are self-hosted and the build contains no inline scripts, so no `unsafe-inline` is needed. The development server (`npm run dev`) must allow inline scripts and websockets for hot reloading, so it uses a looser policy. Run `npm start` to see the strict one.
+
+---
+
+## 5. Why We Chose These Techniques
+
+| Decision | What we chose | What we did not choose, and why |
+|---|---|---|
+| Authentication | **JWT bearer tokens** | **Server-side sessions** store a session record for every login and must look it up on every request. That needs a shared session store once there is more than one server, and cookie sessions need extra CSRF protection. JWTs are checked with the secret alone, work the same for the React app and Postman, and scale without shared state. The cost is that a token cannot be cancelled before it expires, so we keep it short (1 hour) and reload the user on every request, which means deleted accounts and changed roles take effect straight away. |
+| Password hashing | **bcrypt, 12 rounds** | **SHA-256 or MD5** are fast, which helps attackers. **argon2id** is also excellent, but needs a native build that often fails on student Windows machines. bcrypt is slow on purpose, salts every password, and its cost can be raised over time. We use `bcryptjs` (pure JavaScript, no native build). |
+| Token storage in the browser | **sessionStorage** | **localStorage** keeps the token after the browser closes. **httpOnly cookies** cannot be read by scripts, but they are sent automatically, which brings CSRF risk, and they behave awkwardly across the two local servers. With sessionStorage the token disappears when the tab closes, the browser never attaches it automatically (so CSRF does not apply), and a strict CSP plus React's escaping reduce the XSS risk. |
+| Database | **MongoDB Atlas with Mongoose** | A relational database would also work. MongoDB is the "M" in MERN, stores gigs naturally as documents, and Mongoose schemas give a second layer of validation. |
+| Validation | **express-validator** | **Joi or Zod** are good schema libraries, but express-validator is built for Express, and does validation and sanitising in one chain per field. |
+| NoSQL injection | **Remove `$` keys, require strings, Mongoose `sanitizeFilter`** | Relying on only one layer. Three independent layers mean one mistake does not become a breach. |
+| Rate limit storage | **In memory** | **Redis** is needed when several servers share limits. This project runs one server, so in-memory is simpler and has no extra service to run. Part 3 can move to Redis. |
+| Failed-login limit | **Count failed attempts only** | Counting every login would lock out normal users. |
+| Others' bookings | **Return 404, not 403** | A `403` tells an attacker the booking exists. A `404` reveals nothing. |
+| Gig deletion | **Hard delete, with a copy of the title and price kept in bookings** | **Soft delete** leaves hidden records forever. Copying the details keeps history correct without them. |
+| Frontend to API | **Vite proxy** (`/api`) | Calling the API directly means the browser must accept a second self-signed certificate and every request becomes cross-origin. The proxy keeps one origin and a strict `connect-src 'self'`. CORS is still locked down for any direct calls. |
+| Money | **Numbers rounded to 2 decimals, in rand** | **Integer cents** is the safer production choice. For this scope, prices are validated to R1 - R100 000 and rounded on the server. |
+| API test runner | **Newman through `npx`** | Installing Newman in the project adds dozens of dependency warnings that cannot be fixed upstream. Using `npx` with a pinned version keeps `npm audit` at zero for the application. |
