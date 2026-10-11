@@ -264,3 +264,114 @@ The React app (production build) uses: `default-src 'self'; script-src 'self'; s
 | Frontend to API | **Vite proxy** (`/api`) | Calling the API directly means the browser must accept a second self-signed certificate and every request becomes cross-origin. The proxy keeps one origin and a strict `connect-src 'self'`. CORS is still locked down for any direct calls. |
 | Money | **Numbers rounded to 2 decimals, in rand** | **Integer cents** is the safer production choice. For this scope, prices are validated to R1 - R100 000 and rounded on the server. |
 | API test runner | **Newman through `npx`** | Installing Newman in the project adds dozens of dependency warnings that cannot be fixed upstream. Using `npx` with a pinned version keeps `npm audit` at zero for the application. |
+
+---
+
+## 6. Role Permissions
+
+| Action | Client | Freelancer | Admin | Not logged in |
+|---|---|---|---|---|
+| Register and log in | Yes | Yes | Log in only | Yes |
+| Browse and view gigs | Yes | Yes | Yes | No (401) |
+| Create a gig | No (403) | Yes | No (403) | No (401) |
+| Edit a gig | No (403) | Only their own (403 otherwise) | No (403) | No (401) |
+| Delete a gig | No (403) | Only their own (403 otherwise) | Any gig | No (401) |
+| Book a gig | Yes | No (403) | No (403) | No (401) |
+| View bookings | Their own | Ones they received | All | No (401) |
+| Mark a booking completed | No (403) | Only their own (404 otherwise) | No (403) | No (401) |
+| View transactions | Their own payments | Their own earnings | All | No (401) |
+| View income summary | No (403) | Yes | No (403) | No (401) |
+| View users and platform summary | No (403) | No (403) | Yes | No (401) |
+
+---
+
+## 7. API Reference
+
+Base URL: `https://localhost:5000`. Every response has `success` and either `data` or `message`. Send the token as `Authorization: Bearer <token>`.
+
+| Method | Endpoint | Who | Rate limit | Description |
+|---|---|---|---|---|
+| GET | `/api/health` | Anyone | none | Liveness check |
+| POST | `/api/auth/register` | Anyone | 20 per hour per address | Create a client or freelancer account |
+| POST | `/api/auth/login` | Anyone | 10 failed per 15 minutes per address | Log in and receive a JWT |
+| GET | `/api/auth/profile` | Logged in | general | Own profile |
+| GET | `/api/gigs` | Logged in | general | Active gigs. Query: `q`, `category`, `minPrice`, `maxPrice`, `sort` (`newest`, `price_asc`, `price_desc`), `page`, `limit` |
+| GET | `/api/gigs/mine` | Freelancer | general | All of the freelancer's own gigs |
+| GET | `/api/gigs/:id` | Logged in | general | One gig |
+| POST | `/api/gigs` | Freelancer | 30 per 15 minutes per user | Create a gig |
+| PUT | `/api/gigs/:id` | Freelancer (owner) | 30 per 15 minutes per user | Update a gig |
+| DELETE | `/api/gigs/:id` | Freelancer (owner) or admin | 30 per 15 minutes per user | Delete a gig |
+| POST | `/api/bookings` | Client | 5 per 10 minutes per user | Book a gig and create its transaction |
+| GET | `/api/bookings` | Logged in | general | Bookings for the user's role |
+| GET | `/api/bookings/:id` | Client or freelancer on it, or admin | general | One booking |
+| PATCH | `/api/bookings/:id/complete` | Freelancer (owner) | general | Mark a booking completed |
+| GET | `/api/transactions` | Logged in | general | Transactions for the user's role |
+| GET | `/api/transactions/income` | Freelancer | general | Income, estimated tax, income after tax, income per gig |
+| GET | `/api/admin/users` | Admin | general | All users (no password data) |
+| GET | `/api/admin/summary` | Admin | general | Platform totals |
+
+The general limit is 300 requests per 15 minutes per address for all `/api` routes.
+
+### Example: create a gig
+
+```json
+POST /api/gigs
+{
+  "title": "Logo design",
+  "description": "I will design a clean, modern logo for your business.",
+  "category": "Design",
+  "price": 450,
+  "deliveryDays": 3
+}
+```
+
+Success (`201`):
+
+```json
+{
+  "success": true,
+  "message": "Gig created.",
+  "data": {
+    "id": "6650f1c2a1b2c3d4e5f60718",
+    "title": "Logo design",
+    "category": "Design",
+    "price": 450,
+    "deliveryDays": 3,
+    "isActive": true,
+    "freelancer": { "id": "6650f0a1a1b2c3d4e5f60001", "username": "Moe_Alex" }
+  }
+}
+```
+
+### Example: book a gig
+
+```json
+POST /api/bookings
+{ "gigId": "6650f1c2a1b2c3d4e5f60718", "notes": "Please use blue tones." }
+```
+
+Success (`201`) returns both records. Note `amount` comes from the gig, not the request:
+
+```json
+{
+  "success": true,
+  "message": "Booking confirmed.",
+  "data": {
+    "booking": { "id": "...", "gigTitle": "Logo design", "price": 450, "status": "confirmed" },
+    "transaction": { "id": "...", "reference": "TXN-62D255A6F6", "amount": 450, "currency": "ZAR", "status": "completed" }
+  }
+}
+```
+
+### Common errors
+
+| Status | Meaning | Example body |
+|---|---|---|
+| 400 | Validation failed | `{ "success": false, "message": "Validation failed.", "errors": [{ "field": "price", "message": "Price must be a number between R1 and R100 000." }] }` |
+| 401 | Missing, invalid or expired token | `{ "success": false, "message": "Not authorised. Token is invalid or has expired." }` |
+| 403 | Role or ownership not allowed | `{ "success": false, "message": "You can only modify your own gigs." }` |
+| 404 | Not found, or not yours | `{ "success": false, "message": "Booking not found." }` |
+| 409 | Duplicate | `{ "success": false, "message": "An account with that email already exists." }` |
+| 413 | Body over 10 KB | `{ "success": false, "message": "Request body is too large." }` |
+| 429 | Rate limited | `{ "success": false, "message": "You are booking too quickly. Please wait before making another booking.", "retryAfterSeconds": 600 }` |
+| 500 | Unexpected | `{ "success": false, "message": "An unexpected error occurred. Please try again later." }` |
