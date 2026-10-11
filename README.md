@@ -98,3 +98,121 @@ flowchart LR
 9. **express-validator** checks every field. Invalid input is rejected with `400` and field-level messages.
 10. The **controller** does the work. It also checks ownership, for example that a gig belongs to the freelancer editing it.
 11. Any error goes to one **central handler** that logs the details on the server and sends the client a short, safe message.
+
+---
+
+## 3. Data Flow Diagrams
+
+### 3.1 Register
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant R as React app
+    participant A as Express API
+    participant D as MongoDB
+
+    U->>R: Fill in username, email, password, role
+    R->>R: Check the fields in the browser
+    R->>A: POST /api/auth/register
+    A->>A: Limit, sanitise, validate
+    A->>D: Does this email or username exist
+    D-->>A: No
+    A->>A: Hash password with bcrypt, 12 rounds
+    A->>D: Save user with the hash
+    D-->>A: Saved
+    A-->>R: 201 with id, username, email, role
+    R-->>U: Account created, please log in
+```
+
+1. The user enters a username, email, password and chooses **client** or **freelancer**. The React form checks the same rules as the server so mistakes are caught immediately.
+2. The browser sends `POST /api/auth/register` over HTTPS.
+3. The API applies the **registration rate limit** (20 per hour per address), strips NoSQL operators and HTML, then validates: username 3-30 letters, numbers or underscores; a valid email; a password of 8-72 characters with upper case, lower case, a number and a special character; a role of only `client` or `freelancer`. **`admin` is rejected here**, so nobody can promote themselves.
+4. The API checks the email and the lower-cased username are unused. If one is taken it answers `409`.
+5. The password is hashed with **bcrypt using 12 rounds**. The plain password is never stored or logged.
+6. The user is saved. The hash is stored with `select: false`, so it is never returned by any query by default.
+7. The response contains only `id`, `username`, `email` and `role`. The frontend sends the user to the login page.
+
+### 3.2 Login and token issue
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant R as React app
+    participant A as Express API
+    participant D as MongoDB
+
+    U->>R: Enter email and password
+    R->>A: POST /api/auth/login
+    A->>A: Limit failed attempts, sanitise, validate
+    A->>D: Find user by email, include hash
+    D-->>A: User or nothing
+    A->>A: bcrypt compare, using a dummy hash if no user
+    alt Wrong email or wrong password
+        A-->>R: 401 Invalid email or password
+    else Correct
+        A->>A: Sign JWT with id, username, role, 1 hour expiry
+        A-->>R: 200 with token and user
+        R->>R: Keep token in sessionStorage
+    end
+```
+
+1. The user enters their email and password.
+2. The API applies the **login rate limit**: 10 *failed* attempts per 15 minutes per address. Successful logins do not count, so real users are not locked out, but password guessing is throttled.
+3. The input is sanitised and validated. Both fields must be real strings, so a request like `{"email": {"$gt": ""}}` is rejected with `400` before it reaches the database.
+4. The API looks the user up by email and compares the password with `bcrypt.compare`.
+5. If the email does not exist, the API still runs `bcrypt.compare` against a dummy hash. Both failure cases take the same time and return the same message, so an attacker cannot learn which emails are registered.
+6. On success the API signs a **JWT** containing only `id`, `username` and `role`, using HS256 and the secret from `.env`. It expires after 1 hour.
+7. The browser keeps the token in `sessionStorage` and sends it as `Authorization: Bearer <token>` on every later request.
+
+### 3.3 A protected request (how roles are enforced)
+
+```mermaid
+sequenceDiagram
+    participant R as React app
+    participant A as Express API
+    participant D as MongoDB
+
+    R->>A: Request with Authorization Bearer token
+    A->>A: Verify signature, algorithm HS256, expiry
+    A->>D: Load the user by id from the token
+    D-->>A: User and current role
+    A->>A: Is the role allowed on this route
+    A->>A: Validate input
+    A->>D: Query only this user's records
+    D-->>A: Data
+    A-->>R: 200 JSON
+```
+
+1. `protect` rejects a missing, malformed, expired or tampered token with `401`. The algorithm is pinned to HS256, so unsigned tokens (`alg: none`) are refused.
+2. It then **reloads the user from MongoDB**. A deleted account, or a changed role, takes effect immediately instead of when the token expires.
+3. `requireRole('freelancer')` and similar checks return `403` for roles that are not allowed.
+4. Controllers add ownership rules. A freelancer who edits a gig they do not own gets `403`. Bookings and transactions are always queried with the user's own id, so another user's booking looks exactly like one that does not exist (`404`).
+
+### 3.4 Booking a gig and recording the transaction
+
+```mermaid
+sequenceDiagram
+    actor C as Client
+    participant R as React app
+    participant A as Express API
+    participant D as MongoDB
+
+    C->>R: Open a gig and press Confirm booking
+    R->>A: POST /api/bookings with gigId and notes
+    A->>A: Token, client role, booking limit, validation
+    A->>D: Find the gig
+    D-->>A: Gig with its real price
+    A->>D: Create booking using the gig price
+    A->>D: Create transaction with reference TXN-xxxx
+    D-->>A: Saved
+    A-->>R: 201 with booking and transaction
+    R-->>C: Booking confirmed, payment recorded
+```
+
+1. Only users with the **client** role can reach this route. The **booking limit** is 5 per 10 minutes for each user.
+2. The request contains only a `gigId` and optional notes. **The price is never taken from the request.** It is read from the gig stored in MongoDB.
+3. The API creates the **booking** and then the **transaction** (`amount`, `currency: ZAR`, a random `TXN-` reference, client, freelancer, gig).
+4. If the transaction cannot be saved, the booking is deleted again, so a booking never exists without its transaction.
+5. The booking and transaction keep a copy of the gig title and price. Editing or deleting the gig later never changes the history.
+6. The freelancer's **income** is the sum of their transactions. `GET /api/transactions/income` returns total income, an estimated tax figure and income after tax.
