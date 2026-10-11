@@ -48,3 +48,53 @@ Admins cannot register through the app. The first admin is created with `npm run
 - Login now takes the same time whether or not the email exists.
 - The Postman collection grew from 13 to 114 requests and runs automatically with Newman.
 - Added 54 automated frontend tests.
+
+---
+
+## 2. Architecture
+
+```mermaid
+flowchart LR
+    Browser["Browser - React app served over HTTPS"]
+    subgraph Frontend["Vite server - frontend"]
+        Static["Static files with strict CSP"]
+        Proxy["Proxy for /api"]
+    end
+    subgraph Backend["Node.js and Express API - HTTPS"]
+        Sec["Helmet, CSP, CORS"]
+        San["Sanitise body and query"]
+        Rate["Rate limiters"]
+        Authn["JWT check and role check"]
+        Val["Validation"]
+        Ctrl["Controllers"]
+        Err["Central error handler"]
+    end
+    DB[("MongoDB Atlas")]
+
+    Browser --> Static
+    Browser -->|"fetch /api"| Proxy
+    Proxy -->|"HTTPS"| Sec
+    Sec --> San --> Rate --> Authn --> Val --> Ctrl
+    Ctrl --> DB
+    Ctrl -.->|"errors"| Err
+```
+
+### Trust boundaries
+
+- **Browser to servers:** everything is untrusted input. The browser can never decide a price, a role or an owner.
+- **API to database:** only the API holds the database credentials (in `.env`, never committed).
+- The React app hides links and pages a role should not see, but that is only convenience. **Every rule is enforced again on the API.**
+
+### Request flow through the API
+
+1. The request arrives over HTTPS.
+2. **Helmet** adds security headers, including a Content Security Policy. **CORS** checks the origin.
+3. The JSON body is read (maximum 10 KB).
+4. The **sanitiser** removes keys that start with `$` or contain `.` (NoSQL injection) and strips HTML tags from every text value (scripting attacks). Passwords are left untouched.
+5. A **general rate limiter** runs for every `/api` call.
+6. The route's own limiter runs if it has one (login, register, bookings, gig changes).
+7. **`protect`** checks the JWT signature, algorithm and expiry, then reloads the user from MongoDB.
+8. **`requireRole`** checks the user's role is allowed on that route.
+9. **express-validator** checks every field. Invalid input is rejected with `400` and field-level messages.
+10. The **controller** does the work. It also checks ownership, for example that a gig belongs to the freelancer editing it.
+11. Any error goes to one **central handler** that logs the details on the server and sends the client a short, safe message.
