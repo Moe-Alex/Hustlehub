@@ -216,3 +216,31 @@ sequenceDiagram
 4. If the transaction cannot be saved, the booking is deleted again, so a booking never exists without its transaction.
 5. The booking and transaction keep a copy of the gig title and price. Editing or deleting the gig later never changes the history.
 6. The freelancer's **income** is the sum of their transactions. `GET /api/transactions/income` returns total income, an estimated tax figure and income after tax.
+
+---
+
+## 4. Security Measures
+
+| Area | What we do | Where |
+|---|---|---|
+| Passwords | bcrypt, 12 rounds, never returned. Passwords are limited to 72 characters because bcrypt ignores anything longer. | `controllers/authController.js` |
+| Tokens | JWT with HS256 pinned, 1 hour expiry, minimal payload, secret of at least 32 characters required at startup. | `controllers/authController.js`, `middleware/authMiddleware.js`, `config/config.js` |
+| Authentication | Every gig, booking, transaction and admin route requires a valid JWT. | `routes/*.js` |
+| Role-based access | `requireRole` on routes, ownership checks in controllers, queries scoped to the user's id. | `middleware/authMiddleware.js`, `controllers/*.js` |
+| Privilege escalation | `admin` cannot be chosen at registration. Gig owner and price are never read from the request. | `middleware/validationMiddleware.js`, `controllers/gigController.js` |
+| Validation | express-validator on every body, query and id. Every text field must be a real string. | `middleware/validationMiddleware.js` |
+| Sanitisation | NoSQL operators and HTML removed from body and query. Search text is regex-escaped. Mongoose `sanitizeFilter` is on. | `middleware/sanitizeMiddleware.js`, `utils/escapeRegex.js`, `config/db.js` |
+| Rate limiting | General, login (failed only), register, booking, gig writes. Clear 429 message with how long to wait. | `middleware/rateLimiters.js` |
+| Security headers | Helmet, a Content Security Policy that blocks everything, no framing, no referrer, no caching of API responses. | `middleware/securityHeaders.js` |
+| CORS | Only the frontend origins in `CLIENT_ORIGIN` may call the API from a browser. | `middleware/securityHeaders.js` |
+| HTTPS | Both servers run over HTTPS with a locally generated certificate. | `server.js`, `hustlehub-frontend/vite.config.js` |
+| Safe errors | One central handler. Stack traces, file paths and database messages stay in the server log. | `middleware/errorMiddleware.js` |
+| Frontend | React escapes all text, no `dangerouslySetInnerHTML`, strict CSP, token cleared when the tab closes. | `hustlehub-frontend/src` |
+| Dependencies | `npm audit` reports 0 vulnerabilities for both applications. | `package.json` |
+| Audit trail | Registrations, logins, failures, forbidden attempts, bookings and rate-limit hits are logged. | `utils/logger.js` |
+
+### Content Security Policy
+
+The API only returns JSON, so its policy is: `default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`. Nothing from an API response can load a script, style, image or frame.
+
+The React app (production build) uses: `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`. Fonts are self-hosted and the build contains no inline scripts, so no `unsafe-inline` is needed. The development server (`npm run dev`) must allow inline scripts and websockets for hot reloading, so it uses a looser policy. Run `npm start` to see the strict one.
