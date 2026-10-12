@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation } from 'react-router-dom';
 import Alert from '../components/Alert';
 import FormField from '../components/FormField';
 import { useAuth } from '../context/AuthContext';
+import { homeFor } from '../utils/roleHome';
 import { validateLogin } from '../utils/validators';
 
 export default function LoginPage() {
@@ -13,8 +14,8 @@ export default function LoginPage() {
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Already logged in (or just logged in): go back to where they were headed.
-  if (user) return <Navigate to={location.state?.from || '/gigs'} replace />;
+  // Already logged in (or just logged in): every role starts on its own home page.
+  if (user) return <Navigate to={homeFor(user.role)} replace />;
 
   const update = (field) => (event) => setValues((previous) => ({ ...previous, [field]: event.target.value }));
 

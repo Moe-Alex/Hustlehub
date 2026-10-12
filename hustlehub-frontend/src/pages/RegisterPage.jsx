@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import Alert from '../components/Alert';
 import FormField from '../components/FormField';
 import { useAuth } from '../context/AuthContext';
+import { homeFor } from '../utils/roleHome';
 import { validateRegister } from '../utils/validators';
 
 export default function RegisterPage() {
@@ -13,7 +14,7 @@ export default function RegisterPage() {
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (user) return <Navigate to="/gigs" replace />;
+  if (user) return <Navigate to={homeFor(user.role)} replace />;
 
   const update = (field) => (event) => setValues((previous) => ({ ...previous, [field]: event.target.value }));
 

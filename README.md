@@ -47,7 +47,7 @@ Admins cannot register through the app. The first admin is created with `npm run
 - Sanitisation now removes NoSQL operators and HTML from every request.
 - Login now takes the same time whether or not the email exists.
 - The Postman collection grew from 13 to 114 requests and runs automatically with Newman.
-- Added 54 automated frontend tests.
+- Added 57 automated frontend tests.
 
 ---
 
@@ -479,11 +479,11 @@ cd hustlehub-frontend
 npm test
 ```
 
-**54 tests in 12 files** check rendering and behaviour:
+**57 tests in 12 files** check rendering and behaviour:
 
 - `GigCard` renders server text as plain text (an injected `<img onerror>` stays harmless text).
 - `GigForm` shows an error for each invalid field, blocks submission, then submits cleaned numbers.
-- `LoginPage` and `RegisterPage` validate in the browser, call the API with the typed values, and show server errors.
+- `LoginPage` and `RegisterPage` validate in the browser, call the API with the typed values, and show server errors, and `LoginPage` sends each role to its own home page after login (clients to Browse gigs, freelancers to My gigs, admins to Admin).
 - `Navbar` shows the right links for each role.
 - `ProtectedRoute` redirects logged-out visitors and blocks the wrong role.
 - `GigsPage` loads, searches, filters and pages through gigs, and shows empty and error states.
@@ -591,6 +591,6 @@ All screenshots were taken from the production build of the frontend (`npm start
 
 ![Newman HTML report](docs/evidence/newman-report.png)
 
-**Frontend (Vitest):** 12 test files and 54 tests passed.
+**Frontend (Vitest):** 12 test files and 57 tests passed.
 
 ![Vitest results](docs/evidence/vitest-terminal.png)

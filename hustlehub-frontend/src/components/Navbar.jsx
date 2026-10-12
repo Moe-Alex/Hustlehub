@@ -2,6 +2,7 @@
 
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { homeFor } from '../utils/roleHome';
 
 const BROWSE = { to: '/gigs', label: 'Browse gigs' };
 
@@ -18,13 +19,13 @@ export default function Navbar() {
 
   function handleLogout() {
     logout();
-    navigate('/login');
+    navigate('/login', { replace: true });
   }
 
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <Link to={user ? '/gigs' : '/login'} className="wordmark">
+        <Link to={user ? homeFor(user.role) : '/login'} className="wordmark">
           HustleHub<span>+</span>
         </Link>
 

@@ -14,14 +14,22 @@ import MyGigsPage from './pages/MyGigsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import PaymentsPage from './pages/PaymentsPage';
 import RegisterPage from './pages/RegisterPage';
+import { useAuth } from './context/AuthContext';
+import { homeFor } from './utils/roleHome';
 
 const guard = (element, roles) => <ProtectedRoute roles={roles}>{element}</ProtectedRoute>;
+
+// "/" sends each logged-in role to its own home page.
+function RoleHome() {
+  const { user } = useAuth();
+  return <Navigate to={homeFor(user?.role)} replace />;
+}
 
 export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route path="/" element={<Navigate to="/gigs" replace />} />
+        <Route path="/" element={guard(<RoleHome />)} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 

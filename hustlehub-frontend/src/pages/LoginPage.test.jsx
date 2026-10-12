@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LoginPage from './LoginPage';
 import { ApiError } from '../api/client';
@@ -66,5 +66,23 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password.');
+  });
+
+  // Every role starts on its own home page, even if the previous person left a different page open.
+  it.each([
+    ['client', '/gigs'],
+    ['freelancer', '/my-gigs'],
+    ['admin', '/admin'],
+  ])('sends a logged-in %s to %s, ignoring the page that was open before', (role, home) => {
+    useAuth.mockReturnValue({ user: { role }, login, sessionMessage: '' });
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/login', state: { from: '/income' } }]}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path={home} element={<p data-testid="landing">{home}</p>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(screen.getByTestId('landing')).toHaveTextContent(home);
   });
 });
