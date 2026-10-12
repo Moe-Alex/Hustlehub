@@ -53,6 +53,12 @@ Admins cannot register through the app. The first admin is created with `npm run
 
 ## 2. Architecture
 
+![HustleHub+ Part 2 system architecture](Diagram/HustleHub%20Part%202%20System%20Architecture.drawio.png)
+
+*The diagram above is the full system. Its editable source is `Diagram/HustleHub Part 2 System Architecture.drawio`. The Part 1 diagram is kept in the same folder for comparison.*
+
+The same flow as a simpler diagram:
+
 ```mermaid
 flowchart LR
     Browser["Browser - React app served over HTTPS"]
@@ -492,7 +498,9 @@ npm test
 Repository root:
 
 - `README.md` - this file
-- `Diagram/` - architecture diagram (draw.io export)
+- `Diagram/` - architecture diagrams for Part 1 and Part 2 (draw.io source and PNG export)
+- `docs/screenshots/` - screenshots of the running application
+- `docs/evidence/` - Newman and Vitest test evidence, including the Newman HTML report
 - `hustlehub-backend/` - the Express API
 - `hustlehub-frontend/` - the React app
 
@@ -532,3 +540,57 @@ Inside `hustlehub-frontend/`:
 - Tokens cannot be revoked before they expire (1 hour). Refresh tokens and a revocation list would improve this.
 - Money is stored as rand with 2 decimals. Integer cents would be more robust in production.
 - Part 3 will add containers, a CI/CD pipeline with automated tests and security scans, and monitoring.
+
+---
+
+## 12. Screenshots
+
+All screenshots were taken from the production build of the frontend (`npm start`), which uses the strict Content Security Policy.
+
+### Authentication
+
+| | |
+|---|---|
+| ![Register page showing validation messages](docs/screenshots/01-register-validation.png) | ![Login page](docs/screenshots/02-login.png) |
+| *Register page showing validation messages* | *Login page* |
+
+### Client: browse, book and pay
+
+| | |
+|---|---|
+| ![Browse gigs as a client](docs/screenshots/03-browse-gigs.png) | ![A gig with the booking box](docs/screenshots/04-gig-detail-booking.png) |
+| *Browse gigs as a client* | *A gig with the booking box* |
+| ![Booking confirmed with the transaction reference](docs/screenshots/05-booking-confirmed.png) | ![The client's My bookings page](docs/screenshots/06-client-bookings.png) |
+| *Booking confirmed with the transaction reference* | *The client's My bookings page* |
+| ![The client's Payments page](docs/screenshots/07-client-payments.png) | |
+| *The client's Payments page* | |
+
+### Freelancer: gigs, bookings and income
+
+| | |
+|---|---|
+| ![The freelancer's My gigs table](docs/screenshots/08-my-gigs.png) | ![Create gig form rejecting invalid input](docs/screenshots/09-gig-form-validation.png) |
+| *The freelancer's My gigs table* | *Create gig form rejecting invalid input* |
+| ![Bookings received, with Mark completed](docs/screenshots/10-freelancer-bookings.png) | ![Income, estimated tax and income after tax](docs/screenshots/11-income.png) |
+| *Bookings received, with Mark completed* | *Income, estimated tax and income after tax* |
+
+### Admin, access control and security
+
+| | |
+|---|---|
+| ![Admin overview and user list](docs/screenshots/12-admin.png) | ![A client blocked from a freelancer page](docs/screenshots/13-forbidden.png) |
+| *Admin overview and user list* | *A client blocked from a freelancer page* |
+| ![The message shown when the booking rate limit is reached](docs/screenshots/14-rate-limit.png) | ![Response headers including the Content Security Policy](docs/screenshots/15-csp-headers.png) |
+| *The message shown when the booking rate limit is reached* | *Response headers including the Content Security Policy* |
+
+### Test evidence
+
+**Backend (Newman):** 114 requests and 300 assertions, none failed. The full HTML report is in [`docs/evidence/newman-report.html`](docs/evidence/newman-report.html).
+
+![Newman results](docs/evidence/newman-terminal.png)
+
+![Newman HTML report](docs/evidence/newman-report.png)
+
+**Frontend (Vitest):** 12 test files and 54 tests passed.
+
+![Vitest results](docs/evidence/vitest-terminal.png)
