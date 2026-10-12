@@ -438,3 +438,49 @@ To see the strict Content Security Policy that the production build uses, run `n
 2. Log out. Register a **client**, log in, open the gig and press **Confirm booking**.
 3. Log in as the freelancer again. Check **Bookings received**, mark the booking completed, and open **Income**.
 4. Log in with the admin account from `.env` and open **Admin**.
+
+---
+
+## 9. Testing
+
+### Backend: Postman collection and Newman
+
+The collection `hustlehub-backend/postman/HustleHub.postman_collection.json` has **114 requests in 10 folders**, each with automated assertions: authentication, gig CRUD and ownership, bookings and transactions, income, admin, rate limiting (bookings and logins), error handling and CORS, and security headers. It covers success and failure cases for every endpoint.
+
+Run it with Newman:
+
+```bash
+cd hustlehub-backend
+npm test
+```
+
+`npm test` does the following, so it is repeatable and never touches your real data:
+
+1. Empties a separate database called `hustlehub_test` (it refuses to run on any database whose name does not contain "test", or on your real one).
+2. Creates a test admin.
+3. Starts the API on port 5055.
+4. Runs the collection with Newman.
+5. Stops the API and writes reports to `hustlehub-backend/newman/reports/` (`newman-report.html` and `newman-report.json`).
+
+The command exits with an error if any assertion fails. Latest result: **114 requests, 300 assertions, 0 failed**.
+
+To run the collection by hand in Postman, import the collection and `HustleHub.postman_environment.json`, set `adminEmail` and `adminPassword` to your `ADMIN_*` values, turn off SSL certificate verification, and run the folders in order. The login rate-limit folder is last. Restart the API before running it again, because its counters live in memory.
+
+### Frontend: Vitest and Testing Library
+
+```bash
+cd hustlehub-frontend
+npm test
+```
+
+**54 tests in 12 files** check rendering and behaviour:
+
+- `GigCard` renders server text as plain text (an injected `<img onerror>` stays harmless text).
+- `GigForm` shows an error for each invalid field, blocks submission, then submits cleaned numbers.
+- `LoginPage` and `RegisterPage` validate in the browser, call the API with the typed values, and show server errors.
+- `Navbar` shows the right links for each role.
+- `ProtectedRoute` redirects logged-out visitors and blocks the wrong role.
+- `GigsPage` loads, searches, filters and pages through gigs, and shows empty and error states.
+- `GigDetailPage` lets a client book and shows the reference, explains rate limiting, hides booking from freelancers, and asks an admin to confirm before removing a gig.
+- `IncomePage` shows income, estimated tax and income after tax.
+- The API client adds the token, explains `429` with a wait time, never shows raw `500` messages, and treats an expired token differently from a wrong password.
