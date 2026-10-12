@@ -375,3 +375,66 @@ Success (`201`) returns both records. Note `amount` comes from the gig, not the 
 | 413 | Body over 10 KB | `{ "success": false, "message": "Request body is too large." }` |
 | 429 | Rate limited | `{ "success": false, "message": "You are booking too quickly. Please wait before making another booking.", "retryAfterSeconds": 600 }` |
 | 500 | Unexpected | `{ "success": false, "message": "An unexpected error occurred. Please try again later." }` |
+
+---
+
+## 8. Running the Project
+
+### Prerequisites
+
+- **Node.js 22.12 or newer** (check with `node -v`) and npm
+- **OpenSSL** (included with Git Bash on Windows)
+- A **MongoDB Atlas** account (the free tier is enough)
+- Postman (optional, for manual testing)
+
+### Step 1 - Set up MongoDB Atlas
+
+1. Create a free cluster in MongoDB Atlas.
+2. **Database Access:** add a database user with a password.
+3. **Network Access:** add your current IP address.
+4. **Connect > Drivers:** copy the connection string. Replace the password placeholder, and add the database name before the `?`, for example `.../hustlehub?retryWrites=true&w=majority`. If the password contains special characters, URL-encode them.
+
+### Step 2 - Run the backend
+
+```bash
+cd hustlehub-backend
+npm install
+
+# create your settings file, then open .env and fill in every value
+cp .env.example .env
+# generate a JWT secret and paste it into JWT_SECRET
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+
+# create the HTTPS certificate (answers do not matter for local use)
+mkdir certs
+openssl req -nodes -new -x509 -keyout certs/key.pem -out certs/cert.pem -days 365
+
+# create the first administrator from ADMIN_* in .env
+npm run seed:admin
+
+# start the API
+npm run dev
+```
+
+You should see `MongoDB connected` and `HustleHub+ backend listening securely on https://localhost:5000`.
+
+### Step 3 - Run the frontend
+
+Open a second terminal:
+
+```bash
+cd hustlehub-frontend
+npm install
+npm run dev
+```
+
+Open **https://localhost:5173**. The browser warns about the self-signed certificate: choose **Advanced**, then **Proceed to localhost**. You only need to do this once.
+
+To see the strict Content Security Policy that the production build uses, run `npm start` instead (it builds, then serves the build on the same address).
+
+### Try it
+
+1. Register a **freelancer**, log in, and create a gig under **My gigs**.
+2. Log out. Register a **client**, log in, open the gig and press **Confirm booking**.
+3. Log in as the freelancer again. Check **Bookings received**, mark the booking completed, and open **Income**.
+4. Log in with the admin account from `.env` and open **Admin**.
