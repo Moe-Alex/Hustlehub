@@ -484,3 +484,51 @@ npm test
 - `GigDetailPage` lets a client book and shows the reference, explains rate limiting, hides booking from freelancers, and asks an admin to confirm before removing a gig.
 - `IncomePage` shows income, estimated tax and income after tax.
 - The API client adds the token, explains `429` with a wait time, never shows raw `500` messages, and treats an expired token differently from a wrong password.
+
+---
+
+## 10. Project Structure
+
+Repository root:
+
+- `README.md` - this file
+- `Diagram/` - architecture diagram (draw.io export)
+- `hustlehub-backend/` - the Express API
+- `hustlehub-frontend/` - the React app
+
+Inside `hustlehub-backend/`:
+
+- `server.js` - connects to MongoDB, then starts the HTTPS server
+- `app.js` - middleware order and route wiring
+- `config/` - `config.js` (environment settings and rate limits), `db.js` (MongoDB connection), `constants.js` (roles, categories)
+- `models/` - `User.js`, `Gig.js`, `Booking.js`, `Transaction.js`
+- `controllers/` - `authController.js`, `gigController.js`, `bookingController.js`, `transactionController.js`, `adminController.js`
+- `routes/` - `authRoutes.js`, `gigRoutes.js`, `bookingRoutes.js`, `transactionRoutes.js`, `adminRoutes.js`
+- `middleware/` - `authMiddleware.js`, `validationMiddleware.js`, `sanitizeMiddleware.js`, `rateLimiters.js`, `securityHeaders.js`, `errorMiddleware.js`
+- `utils/` - `logger.js`, `pagination.js`, `escapeRegex.js`, `money.js`
+- `scripts/` - `seedAdmin.js`, `run-newman.js`
+- `postman/` - the collection and environment files
+- `newman/reports/` - generated test reports (not committed)
+
+Inside `hustlehub-frontend/`:
+
+- `vite.config.js` - HTTPS, `/api` proxy, Content Security Policy, test setup
+- `src/api/` - `client.js` (all API calls)
+- `src/context/` - `AuthContext.jsx`
+- `src/hooks/` - `useApi.js`
+- `src/components/` - shared pieces (`Navbar`, `ProtectedRoute`, `GigCard`, `GigForm`, `FormField`, `Alert`, and others)
+- `src/pages/` - one file per screen
+- `src/utils/` - formatting and validation helpers
+- `src/styles/` - `index.css`
+- `src/**/*.test.js(x)` - the automated tests
+
+---
+
+## 11. Known Limitations and Next Steps
+
+- No payment gateway is connected: bookings record a transaction in the database. A real provider would be added behind the same transaction records.
+- The estimated tax is a flat rate for illustration, not tax advice.
+- Rate limits are stored in memory, which suits a single server. Several servers would need Redis.
+- Tokens cannot be revoked before they expire (1 hour). Refresh tokens and a revocation list would improve this.
+- Money is stored as rand with 2 decimals. Integer cents would be more robust in production.
+- Part 3 will add containers, a CI/CD pipeline with automated tests and security scans, and monitoring.
