@@ -98,6 +98,8 @@ export const api = {
   bookings: {
     create: (data) => request('POST', '/bookings', { body: data }),
     list: (query) => request('GET', '/bookings', { query }),
+    accept: (id) => request('PATCH', `/bookings/${id}/accept`),
+    reject: (id) => request('PATCH', `/bookings/${id}/reject`),
     complete: (id) => request('PATCH', `/bookings/${id}/complete`),
   },
   transactions: {

@@ -3,13 +3,14 @@ import { api } from '../api/client';
 import DataState from '../components/DataState';
 import PageHeader from '../components/PageHeader';
 import Pagination from '../components/Pagination';
+import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
 import { formatDate, formatZAR } from '../utils/format';
 
 const COPY = {
-  client: { title: 'Payments', intro: 'Payments for the gigs you booked.' },
-  freelancer: { title: 'Earnings', intro: 'Payments received for your gigs.' },
+  client: { title: 'Payments', intro: 'Payments for the gigs you booked. A payment stays pending until the work is completed.' },
+  freelancer: { title: 'Earnings', intro: 'Payments for your gigs. Only completed work counts as income.' },
   admin: { title: 'All transactions', intro: 'Every payment on the platform.' },
 };
 
@@ -25,7 +26,7 @@ export default function PaymentsPage() {
       <PageHeader title={copy.title} intro={copy.intro} />
       <DataState loading={loading} error={error} loadingLabel="Loading transactions...">
         {transactions.length === 0 ? (
-          <section className="empty-state"><h2>No transactions yet</h2><p>They appear here as soon as a booking is made.</p></section>
+          <section className="empty-state"><h2>No transactions yet</h2><p>They appear here as soon as a booking request is sent.</p></section>
         ) : (
           <>
             <div className="table-wrap">
@@ -39,6 +40,7 @@ export default function PaymentsPage() {
                     {user.role !== 'client' && <th scope="col">Client</th>}
                     {user.role !== 'freelancer' && <th scope="col">Freelancer</th>}
                     <th scope="col" className="num">Amount</th>
+                    <th scope="col">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -50,6 +52,7 @@ export default function PaymentsPage() {
                       {user.role !== 'client' && <td>{transaction.client?.username}</td>}
                       {user.role !== 'freelancer' && <td>{transaction.freelancer?.username}</td>}
                       <td className="num">{formatZAR(transaction.amount)}</td>
+                      <td><StatusBadge status={transaction.status} /></td>
                     </tr>
                   ))}
                 </tbody>

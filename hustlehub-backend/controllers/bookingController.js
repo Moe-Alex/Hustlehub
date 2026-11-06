@@ -1,4 +1,6 @@
-// Bookings. A booking always creates a transaction record so income can be tracked.
+// Bookings. A client sends a booking request (pending); the freelancer accepts or rejects it, and later
+// marks accepted work as completed. A booking always has a transaction record so income can be tracked,
+// but income only counts once the booking is completed.
 
 const crypto = require('crypto');
 const Booking = require('../models/Booking');
@@ -56,7 +58,7 @@ async function createBooking(req, res, next) {
     logger.info(`Booking ${booking.id} created by ${req.user.email}; transaction ${transaction.reference} for R${transaction.amount}`);
     return res.status(201).json({
       success: true,
-      message: 'Booking confirmed.',
+      message: 'Booking request sent. The freelancer must accept it before work starts.',
       data: { booking, transaction },
     });
   } catch (err) {
@@ -97,25 +99,68 @@ async function getBooking(req, res, next) {
   }
 }
 
-// PATCH /api/bookings/:id/complete - the freelancer who owns the booking only
-async function completeBooking(req, res, next) {
+// Moves a booking from one status to the next. Only the freelancer who owns the booking can do this.
+// The status check is part of the update itself, so two requests at the same time cannot both succeed.
+// Someone else's booking looks exactly like a booking that does not exist (404).
+async function transition(req, res, next, { from, to, transactionStatus, refusal, success, logLine }) {
   try {
-    const booking = await Booking.findOne({ _id: req.params.id, freelancer: req.user.id });
+    const booking = await Booking.findOneAndUpdate(
+      { _id: req.params.id, freelancer: req.user.id, status: from },
+      { status: to },
+      { returnDocument: 'after' }
+    );
+
     if (!booking) {
-      return res.status(404).json({ success: false, message: 'Booking not found.' });
-    }
-    if (booking.status !== 'confirmed') {
-      return res.status(409).json({ success: false, message: 'Only confirmed bookings can be marked as completed.' });
+      const exists = await Booking.exists({ _id: req.params.id, freelancer: req.user.id });
+      if (!exists) {
+        return res.status(404).json({ success: false, message: 'Booking not found.' });
+      }
+      return res.status(409).json({ success: false, message: refusal });
     }
 
-    booking.status = 'completed';
-    await booking.save();
+    if (transactionStatus) {
+      try {
+        await Transaction.updateOne({ booking: booking._id }, { status: transactionStatus });
+      } catch (err) {
+        await Booking.updateOne({ _id: booking._id }, { status: from }); // keep booking and payment in step
+        throw err;
+      }
+    }
 
-    logger.info(`Booking ${booking.id} completed by ${req.user.email}`);
-    return res.status(200).json({ success: true, message: 'Booking marked as completed.', data: booking });
+    logger.info(`Booking ${booking.id} ${logLine} by ${req.user.email}`);
+    return res.status(200).json({ success: true, message: success, data: booking });
   } catch (err) {
     return next(err);
   }
 }
 
-module.exports = { createBooking, listBookings, getBooking, completeBooking, scopeFor };
+// PATCH /api/bookings/:id/accept - pending -> accepted
+const acceptBooking = (req, res, next) => transition(req, res, next, {
+  from: 'pending',
+  to: 'accepted',
+  refusal: 'Only pending bookings can be accepted.',
+  success: 'Booking accepted.',
+  logLine: 'accepted',
+});
+
+// PATCH /api/bookings/:id/reject - pending -> rejected (the payment record is cancelled)
+const rejectBooking = (req, res, next) => transition(req, res, next, {
+  from: 'pending',
+  to: 'rejected',
+  transactionStatus: 'cancelled',
+  refusal: 'Only pending bookings can be rejected.',
+  success: 'Booking rejected.',
+  logLine: 'rejected',
+});
+
+// PATCH /api/bookings/:id/complete - accepted -> completed (the payment now counts as income)
+const completeBooking = (req, res, next) => transition(req, res, next, {
+  from: 'accepted',
+  to: 'completed',
+  transactionStatus: 'completed',
+  refusal: 'Only accepted bookings can be marked as completed.',
+  success: 'Booking marked as completed.',
+  logLine: 'completed',
+});
+
+module.exports = { createBooking, listBookings, getBooking, acceptBooking, rejectBooking, completeBooking, scopeFor };

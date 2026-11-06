@@ -20,7 +20,7 @@ export default function AdminPage() {
             <div><dt>Freelancers</dt><dd>{stats.users.freelancers}</dd></div>
             <div><dt>Gigs listed</dt><dd>{stats.gigs}</dd></div>
             <div><dt>Bookings</dt><dd>{stats.bookings}</dd></div>
-            <div><dt>Transaction value</dt><dd>{formatZAR(stats.transactions.totalValue)}</dd></div>
+            <div><dt>Completed value</dt><dd>{formatZAR(stats.transactions.totalValue)}</dd></div>
           </dl>
         )}
       </DataState>

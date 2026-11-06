@@ -17,7 +17,7 @@ ST10434391 - Nkosana Mavunhla
 
 ## 1. Project Overview
 
-**HustleHub+** is a secure freelance marketplace. **Freelancers** list services ("gigs"), **clients** browse and book them, and every booking creates a transaction so freelancers can see what they have earned and an estimate of the tax they may owe. Each booking records a payment transaction in the database.
+**HustleHub+** is a secure freelance marketplace. **Freelancers** list services ("gigs"), **clients** browse and request them, and every booking request creates a transaction record. A freelancer must **accept** a request before work starts, and only completed work counts as income, so freelancers can see what they have earned and an estimate of the tax they may owe.
 
 The platform handles credentials, bookings and income data, so security is a design requirement from the start, not a later addition.
 
@@ -25,8 +25,8 @@ The platform handles credentials, bookings and income data, so security is a des
 
 | Role | What they can do |
 |---|---|
-| **Client** | Browse and search gigs, book a gig, see their own bookings and payments. |
-| **Freelancer** | Create, edit and delete their own gigs, see bookings they received, mark them completed, track income and estimated tax. |
+| **Client** | Browse and search gigs, send a booking request, see their own bookings and payments. A client can never accept, reject or complete a booking, including their own. |
+| **Freelancer** | Create, edit and delete their own gigs, see booking requests they received, accept or reject them, mark accepted work completed, track income and estimated tax. |
 | **Admin** | See every user, booking and transaction, and remove any gig for moderation. Admins cannot book gigs or create gigs. |
 
 Admins cannot register through the app. The first admin is created with `npm run seed:admin`.
@@ -46,8 +46,9 @@ Admins cannot register through the app. The first admin is created with `npm run
 - Added a Content Security Policy, a locked-down CORS list and rate limiting on login, registration, bookings and gig changes.
 - Sanitisation now removes NoSQL operators and HTML from every request.
 - Login now takes the same time whether or not the email exists.
-- The Postman collection grew from 13 to 114 requests and runs automatically with Newman.
-- Added 57 automated frontend tests.
+- The Postman collection grew from 13 to 141 requests and runs automatically with Newman.
+- Added 63 automated frontend tests.
+- **Booking approval workflow (added after Part 2 feedback):** a booking used to be confirmed the moment a client made it. Now a booking starts as `pending`, and only the freelancer who owns the gig can accept or reject it. Accepted work can then be marked completed. See section 3.4.
 
 ---
 
@@ -195,33 +196,62 @@ sequenceDiagram
 3. `requireRole('freelancer')` and similar checks return `403` for roles that are not allowed.
 4. Controllers add ownership rules. A freelancer who edits a gig they do not own gets `403`. Bookings and transactions are always queried with the user's own id, so another user's booking looks exactly like one that does not exist (`404`).
 
-### 3.4 Booking a gig and recording the transaction
+### 3.4 Booking a gig: request, accept or reject, complete
+
+A booking is a **request** until the freelancer decides on it. The client cannot confirm their own booking.
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: Client sends a request
+    pending --> accepted: Freelancer accepts
+    pending --> rejected: Freelancer rejects
+    accepted --> completed: Freelancer marks the work done
+    rejected --> [*]
+    completed --> [*]
+```
+
+| Booking status | Transaction status | Counts as income? |
+|---|---|---|
+| `pending` | `pending` | No |
+| `accepted` | `pending` | No |
+| `rejected` | `cancelled` | No |
+| `completed` | `completed` | Yes |
 
 ```mermaid
 sequenceDiagram
     actor C as Client
+    actor F as Freelancer
     participant R as React app
     participant A as Express API
     participant D as MongoDB
 
-    C->>R: Open a gig and press Confirm booking
+    C->>R: Open a gig and press Send booking request
     R->>A: POST /api/bookings with gigId and notes
     A->>A: Token, client role, booking limit, validation
     A->>D: Find the gig
     D-->>A: Gig with its real price
-    A->>D: Create booking using the gig price
-    A->>D: Create transaction with reference TXN-xxxx
-    D-->>A: Saved
+    A->>D: Create booking (status pending) using the gig price
+    A->>D: Create transaction (status pending) with reference TXN-xxxx
     A-->>R: 201 with booking and transaction
-    R-->>C: Booking confirmed, payment recorded
+    R-->>C: Request sent, waiting for the freelancer
+    F->>R: Open Bookings received and press Accept
+    R->>A: PATCH /api/bookings/:id/accept
+    A->>D: Update only if pending and owned by this freelancer
+    A-->>R: 200 accepted
+    F->>R: Press Mark completed when the work is done
+    R->>A: PATCH /api/bookings/:id/complete
+    A->>D: Update only if accepted; mark the transaction completed
+    A-->>R: 200 completed
 ```
 
-1. Only users with the **client** role can reach this route. The **booking limit** is 5 per 10 minutes for each user.
-2. The request contains only a `gigId` and optional notes. **The price is never taken from the request.** It is read from the gig stored in MongoDB.
-3. The API creates the **booking** and then the **transaction** (`amount`, `currency: ZAR`, a random `TXN-` reference, client, freelancer, gig).
-4. If the transaction cannot be saved, the booking is deleted again, so a booking never exists without its transaction.
-5. The booking and transaction keep a copy of the gig title and price. Editing or deleting the gig later never changes the history.
-6. The freelancer's **income** is the sum of their transactions. `GET /api/transactions/income` returns total income, an estimated tax figure and income after tax.
+1. Only users with the **client** role can create a booking. The **booking limit** is 5 per 10 minutes for each user.
+2. The request contains only a `gigId` and optional notes. **The price and the status are never taken from the request.** The price is read from the gig stored in MongoDB, and the status always starts as `pending` (a `status` sent by the client is ignored).
+3. The API creates the **booking** and then the **transaction** (`amount`, `currency: ZAR`, a random `TXN-` reference, client, freelancer, gig). If the transaction cannot be saved, the booking is deleted again, so a booking never exists without its transaction.
+4. `PATCH /api/bookings/:id/accept` and `/reject` are for the **freelancer who owns the booking** only. A client or admin gets `403`. A freelancer who does not own the booking gets `404`, the same as a booking that does not exist.
+5. Each status change is one database update that includes the required current status. A booking that is not in the right state gets `409` (for example, accepting twice, rejecting an accepted booking, or completing a booking that was never accepted), and two requests at the same moment cannot both succeed.
+6. Rejecting cancels the transaction. Completing marks it `completed`.
+7. The booking and transaction keep a copy of the gig title and price. Editing or deleting the gig later never changes the history.
+8. The freelancer's **income** is the sum of their **completed** transactions only. `GET /api/transactions/income` returns total income, an estimated tax figure and income after tax. The admin overview also counts only completed transactions in its value figure.
 
 ---
 
@@ -284,7 +314,8 @@ The React app (production build) uses: `default-src 'self'; script-src 'self'; s
 | Delete a gig | No (403) | Only their own (403 otherwise) | Any gig | No (401) |
 | Book a gig | Yes | No (403) | No (403) | No (401) |
 | View bookings | Their own | Ones they received | All | No (401) |
-| Mark a booking completed | No (403) | Only their own (404 otherwise) | No (403) | No (401) |
+| Accept or reject a booking request | No (403) | Only their own (404 otherwise) | No (403) | No (401) |
+| Mark an accepted booking completed | No (403) | Only their own (404 otherwise) | No (403) | No (401) |
 | View transactions | Their own payments | Their own earnings | All | No (401) |
 | View income summary | No (403) | Yes | No (403) | No (401) |
 | View users and platform summary | No (403) | No (403) | Yes | No (401) |
@@ -307,10 +338,12 @@ Base URL: `https://localhost:5000`. Every response has `success` and either `dat
 | POST | `/api/gigs` | Freelancer | 30 per 15 minutes per user | Create a gig |
 | PUT | `/api/gigs/:id` | Freelancer (owner) | 30 per 15 minutes per user | Update a gig |
 | DELETE | `/api/gigs/:id` | Freelancer (owner) or admin | 30 per 15 minutes per user | Delete a gig |
-| POST | `/api/bookings` | Client | 5 per 10 minutes per user | Book a gig and create its transaction |
+| POST | `/api/bookings` | Client | 5 per 10 minutes per user | Send a booking request (status `pending`) and create its pending transaction |
 | GET | `/api/bookings` | Logged in | general | Bookings for the user's role |
 | GET | `/api/bookings/:id` | Client or freelancer on it, or admin | general | One booking |
-| PATCH | `/api/bookings/:id/complete` | Freelancer (owner) | general | Mark a booking completed |
+| PATCH | `/api/bookings/:id/accept` | Freelancer (owner) | general | Accept a `pending` booking (`409` otherwise) |
+| PATCH | `/api/bookings/:id/reject` | Freelancer (owner) | general | Reject a `pending` booking and cancel its transaction (`409` otherwise) |
+| PATCH | `/api/bookings/:id/complete` | Freelancer (owner) | general | Mark an `accepted` booking completed (`409` otherwise) |
 | GET | `/api/transactions` | Logged in | general | Transactions for the user's role |
 | GET | `/api/transactions/income` | Freelancer | general | Income, estimated tax, income after tax, income per gig |
 | GET | `/api/admin/users` | Admin | general | All users (no password data) |
@@ -349,22 +382,22 @@ Success (`201`):
 }
 ```
 
-### Example: book a gig
+### Example: request a booking
 
 ```json
 POST /api/bookings
 { "gigId": "6650f1c2a1b2c3d4e5f60718", "notes": "Please use blue tones." }
 ```
 
-Success (`201`) returns both records. Note `amount` comes from the gig, not the request:
+Success (`201`) returns both records. Note `amount` comes from the gig, not the request, and the status is `pending` whatever the client sends:
 
 ```json
 {
   "success": true,
-  "message": "Booking confirmed.",
+  "message": "Booking request sent. The freelancer must accept it before work starts.",
   "data": {
-    "booking": { "id": "...", "gigTitle": "Logo design", "price": 450, "status": "confirmed" },
-    "transaction": { "id": "...", "reference": "TXN-62D255A6F6", "amount": 450, "currency": "ZAR", "status": "completed" }
+    "booking": { "id": "...", "gigTitle": "Logo design", "price": 450, "status": "pending" },
+    "transaction": { "id": "...", "reference": "TXN-62D255A6F6", "amount": 450, "currency": "ZAR", "status": "pending" }
   }
 }
 ```
@@ -441,9 +474,11 @@ To see the strict Content Security Policy that the production build uses, run `n
 ### Try it
 
 1. Register a **freelancer**, log in, and create a gig under **My gigs**.
-2. Log out. Register a **client**, log in, open the gig and press **Confirm booking**.
-3. Log in as the freelancer again. Check **Bookings received**, mark the booking completed, and open **Income**.
+2. Log out. Register a **client**, log in, open the gig and press **Send booking request**. The booking shows as **Pending** under **My bookings**, and there is no way for the client to confirm it.
+3. Log in as the freelancer again. Open **Bookings received**, press **Accept** (or **Reject**), then press **Mark completed**. **Income** stays at zero until the booking is completed.
 4. Log in with the admin account from `.env` and open **Admin**.
+
+**Upgrading older data:** bookings made before the approval workflow have the old status `confirmed`. Run `npm run migrate:bookings` once in `hustlehub-backend` to turn them into `accepted` (their payment goes back to `pending` until the work is completed). It is safe to run more than once, and it is not needed on a fresh database.
 
 ---
 
@@ -451,7 +486,13 @@ To see the strict Content Security Policy that the production build uses, run `n
 
 ### Backend: Postman collection and Newman
 
-The collection `hustlehub-backend/postman/HustleHub.postman_collection.json` has **114 requests in 10 folders**, each with automated assertions: authentication, gig CRUD and ownership, bookings and transactions, income, admin, rate limiting (bookings and logins), error handling and CORS, and security headers. It covers success and failure cases for every endpoint.
+The collection `hustlehub-backend/postman/HustleHub.postman_collection.json` has **141 requests in 10 folders**, each with automated assertions: authentication, gig CRUD and ownership, the booking approval workflow (pending, accepted, rejected, completed) and its transactions, income, admin, rate limiting (bookings and logins), error handling and CORS, and security headers. It covers success and failure cases for every endpoint. For the booking workflow it checks that:
+
+- a new booking is `pending` and a client-supplied status is ignored;
+- a client, an admin and a visitor with no token cannot accept, reject or complete (`403` / `401`);
+- a freelancer who does not own the booking gets `404`, and a malformed or unknown id gets `400` / `404`;
+- wrong-order transitions are refused with `409` (completing before accepting, accepting twice, rejecting an accepted booking, accepting or completing a rejected or completed booking);
+- income, the transaction status and the admin value figure only count a booking once it is completed, and a rejected booking leaves a cancelled transaction.
 
 Run it with Newman:
 
@@ -468,7 +509,7 @@ npm test
 4. Runs the collection with Newman.
 5. Stops the API and writes reports to `hustlehub-backend/newman/reports/` (`newman-report.html` and `newman-report.json`).
 
-The command exits with an error if any assertion fails. Latest result: **114 requests, 300 assertions, 0 failed**.
+The command exits with an error if any assertion fails. The runner checks the test database name, waits until the API answers over HTTPS before starting, uses pinned Newman versions and prints a one-line summary at the end. Latest result: **141 requests, 372 assertions, 0 failed**.
 
 To run the collection by hand in Postman, import the collection and `HustleHub.postman_environment.json`, set `adminEmail` and `adminPassword` to your `ADMIN_*` values, turn off SSL certificate verification, and run the folders in order. The login rate-limit folder is last. Restart the API before running it again, because its counters live in memory.
 
@@ -479,7 +520,7 @@ cd hustlehub-frontend
 npm test
 ```
 
-**57 tests in 12 files** check rendering and behaviour:
+**63 tests in 13 files** check rendering and behaviour:
 
 - `GigCard` renders server text as plain text (an injected `<img onerror>` stays harmless text).
 - `GigForm` shows an error for each invalid field, blocks submission, then submits cleaned numbers.
@@ -487,9 +528,10 @@ npm test
 - `Navbar` shows the right links for each role.
 - `ProtectedRoute` redirects logged-out visitors and blocks the wrong role.
 - `GigsPage` loads, searches, filters and pages through gigs, and shows empty and error states.
-- `GigDetailPage` lets a client book and shows the reference, explains rate limiting, hides booking from freelancers, and asks an admin to confirm before removing a gig.
+- `GigDetailPage` lets a client send a booking request (there is no "Confirm" button) and shows the pending reference, explains rate limiting, hides booking from freelancers, and asks an admin to confirm before removing a gig.
+- `BookingsPage` shows a freelancer **Accept** and **Reject** for pending requests and **Mark completed** for accepted ones, calls the right endpoint, shows the server's message when an action is refused, and gives a client no buttons at all.
 - `IncomePage` shows income, estimated tax and income after tax.
-- The API client adds the token, explains `429` with a wait time, never shows raw `500` messages, and treats an expired token differently from a wrong password.
+- The API client uses the accept, reject and complete endpoints, adds the token, explains `429` with a wait time, never shows raw `500` messages, and treats an expired token differently from a wrong password.
 
 ---
 
@@ -514,7 +556,7 @@ Inside `hustlehub-backend/`:
 - `routes/` - `authRoutes.js`, `gigRoutes.js`, `bookingRoutes.js`, `transactionRoutes.js`, `adminRoutes.js`
 - `middleware/` - `authMiddleware.js`, `validationMiddleware.js`, `sanitizeMiddleware.js`, `rateLimiters.js`, `securityHeaders.js`, `errorMiddleware.js`
 - `utils/` - `logger.js`, `pagination.js`, `escapeRegex.js`, `money.js`
-- `scripts/` - `seedAdmin.js`, `run-newman.js`
+- `scripts/` - `seedAdmin.js`, `run-newman.js`, `migrateBookingStatuses.js`
 - `postman/` - the collection and environment files
 - `newman/reports/` - generated test reports (not committed)
 
@@ -534,7 +576,7 @@ Inside `hustlehub-frontend/`:
 
 ## 11. Known Limitations and Next Steps
 
-- No payment gateway is connected: bookings record a transaction in the database. A real provider would be added behind the same transaction records.
+- No payment gateway is connected: bookings record a transaction in the database, which stays pending until the work is completed. A real provider would be added behind the same transaction records.
 - The estimated tax is a flat rate for illustration, not tax advice.
 - Rate limits are stored in memory, which suits a single server. Several servers would need Redis.
 - Tokens cannot be revoked before they expire (1 hour). Refresh tokens and a revocation list would improve this.
@@ -554,16 +596,16 @@ All screenshots were taken from the production build of the frontend (`npm start
 | ![Register page showing validation messages](docs/screenshots/01-register-validation.png) | ![Login page](docs/screenshots/02-login.png) |
 | *Register page showing validation messages* | *Login page* |
 
-### Client: browse, book and pay
+### Client: browse, request a booking and pay
 
 | | |
 |---|---|
-| ![Browse gigs as a client](docs/screenshots/03-browse-gigs.png) | ![A gig with the booking box](docs/screenshots/04-gig-detail-booking.png) |
-| *Browse gigs as a client* | *A gig with the booking box* |
-| ![Booking confirmed with the transaction reference](docs/screenshots/05-booking-confirmed.png) | ![The client's My bookings page](docs/screenshots/06-client-bookings.png) |
-| *Booking confirmed with the transaction reference* | *The client's My bookings page* |
+| ![Browse gigs as a client](docs/screenshots/03-browse-gigs.png) | ![A gig with the booking request box](docs/screenshots/04-gig-detail-booking.png) |
+| *Browse gigs as a client* | *A gig with the booking request box* |
+| ![Booking request sent, with the pending transaction reference](docs/screenshots/05-booking-requested.png) | ![The client's My bookings page](docs/screenshots/06-client-bookings.png) |
+| *Booking request sent, with the pending transaction reference* | *The client's My bookings page, showing a Pending request* |
 | ![The client's Payments page](docs/screenshots/07-client-payments.png) | |
-| *The client's Payments page* | |
+| *The client's Payments page, with each payment's status* | |
 
 ### Freelancer: gigs, bookings and income
 
@@ -571,8 +613,8 @@ All screenshots were taken from the production build of the frontend (`npm start
 |---|---|
 | ![The freelancer's My gigs table](docs/screenshots/08-my-gigs.png) | ![Create gig form rejecting invalid input](docs/screenshots/09-gig-form-validation.png) |
 | *The freelancer's My gigs table* | *Create gig form rejecting invalid input* |
-| ![Bookings received, with Mark completed](docs/screenshots/10-freelancer-bookings.png) | ![Income, estimated tax and income after tax](docs/screenshots/11-income.png) |
-| *Bookings received, with Mark completed* | *Income, estimated tax and income after tax* |
+| ![Bookings received, with Accept, Reject and Mark completed](docs/screenshots/10-freelancer-bookings.png) | ![Income, estimated tax and income after tax](docs/screenshots/11-income.png) |
+| *Bookings received, with Accept, Reject and Mark completed* | *Income, estimated tax and income after tax* |
 
 ### Admin, access control and security
 
@@ -585,12 +627,12 @@ All screenshots were taken from the production build of the frontend (`npm start
 
 ### Test evidence
 
-**Backend (Newman):** 114 requests and 300 assertions, none failed. The full HTML report is in [`docs/evidence/newman-report.html`](docs/evidence/newman-report.html).
+**Backend (Newman):** 141 requests and 372 assertions, none failed. The full HTML report is in [`docs/evidence/newman-report.html`](docs/evidence/newman-report.html).
 
 ![Newman results](docs/evidence/newman-terminal.png)
 
 ![Newman HTML report](docs/evidence/newman-report.png)
 
-**Frontend (Vitest):** 12 test files and 57 tests passed.
+**Frontend (Vitest):** 13 test files and 63 tests passed.
 
 ![Vitest results](docs/evidence/vitest-terminal.png)

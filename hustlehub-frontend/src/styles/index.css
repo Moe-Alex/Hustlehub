@@ -156,9 +156,16 @@ a:hover { color: var(--jacaranda-dark); }
 .mono { font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 0.9rem; }
 .cell-note { margin: 0.25rem 0 0; color: var(--ink-soft); font-size: 0.9rem; }
 .badge { display: inline-block; border-radius: 999px; padding: 0.1rem 0.65rem; font-size: 0.85rem; font-weight: 650; }
-.badge-confirmed { background: var(--jacaranda-tint); color: var(--jacaranda-dark); }
+.badge-pending { background: #fdf0d5; color: #7a4b00; }
+.badge-accepted { background: var(--jacaranda-tint); color: var(--jacaranda-dark); }
 .badge-completed, .badge-active { background: var(--leaf-tint); color: var(--leaf); }
+.badge-rejected, .badge-cancelled { background: #fbe4e4; color: #8a1c1c; }
 .badge-inactive { background: #e9e7f0; color: var(--ink-soft); }
+.btn-sm { padding: 0.4rem 0.85rem; font-size: 0.9rem; border-radius: 6px; }
+.btn-outline-danger { background: var(--surface); color: var(--brick); border-color: var(--brick); }
+.btn-outline-danger:hover:not(:disabled) { background: #fbe4e4; }
+.table td.actions { white-space: nowrap; }
+.row-actions { display: flex; align-items: center; gap: 0.5rem; }
 .table-wrap + p { margin-top: 1rem; }
 .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.75rem; }
 

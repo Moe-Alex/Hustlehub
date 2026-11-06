@@ -74,20 +74,20 @@ export default function GigDetailPage() {
 
           {user.role === 'client' && !confirmation && (
             <form className="booking-box" onSubmit={handleBook} noValidate>
-              <h2>Book this gig</h2>
+              <h2>Request this gig</h2>
               <FormField as="textarea" id="notes" label="Notes for the freelancer (optional)" rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} error={notesError} hint={`${notes.length} of 500 characters`} />
-              <p className="booking-total">Total: <strong>{formatZAR(gig.price)}</strong>.</p>
+              <p className="booking-total">Total: <strong>{formatZAR(gig.price)}</strong>. The freelancer must accept your request before work starts.</p>
               <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? 'Booking...' : 'Confirm booking'}
+                {submitting ? 'Sending...' : 'Send booking request'}
               </button>
             </form>
           )}
 
           {confirmation && (
             <section className="booking-box booking-done" role="status">
-              <h2>Booking confirmed</h2>
+              <h2>Booking request sent</h2>
               <p>
-                Your payment of <strong>{formatZAR(confirmation.transaction.amount)}</strong> was recorded. Your reference is{' '}
+                The freelancer has been asked to accept your request. Your payment of <strong>{formatZAR(confirmation.transaction.amount)}</strong> stays pending until the work is completed. Your reference is{' '}
                 <strong>{confirmation.transaction.reference}</strong>.
               </p>
               <Link className="btn btn-primary" to="/bookings">View my bookings</Link>

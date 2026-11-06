@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "HustleHub+ API (Part 2)",
-    "description": "Automated API tests for HustleHub+: authentication, gigs, bookings, transactions, RBAC, validation, sanitisation, security headers and rate limiting. Run with `npm test` (Newman) or import into Postman and run the collection in order.",
+    "description": "Automated API tests for HustleHub+: authentication, gigs, the booking approval workflow (pending, accepted, rejected, completed), transactions and income, RBAC, validation, sanitisation, security headers and rate limiting. Run with `npm test` (Newman) or import into Postman and run the collection in order.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -1662,7 +1662,7 @@
     },
     {
       "name": "03 - Bookings (and their transactions)",
-      "description": "Clients book gigs. Every booking creates a transaction. Users only see their own records.",
+      "description": "Clients send booking requests; the freelancer who owns the gig accepts or rejects them and later completes accepted work. A client can never confirm their own booking. Every request creates a transaction, but it only counts as income once the booking is completed. Users only see their own records.",
       "item": [
         {
           "name": "Freelancer cannot book (403)",
@@ -1852,7 +1852,7 @@
           }
         },
         {
-          "name": "Client A books the gig and a transaction is created (201)",
+          "name": "Client A requests a booking and a pending transaction is created (201)",
           "event": [
             {
               "listen": "test",
@@ -1868,7 +1868,10 @@
                   "pm.test('Transaction amount equals the gig price', () => pm.expect(d.transaction.amount).to.eql(price));",
                   "pm.test('Transaction is linked to the booking', () => pm.expect(d.transaction.booking).to.eql(d.booking.id));",
                   "pm.test('Transaction has a reference and ZAR currency', () => { pm.expect(d.transaction.reference).to.match(/^TXN-[0-9A-F]{10}$/); pm.expect(d.transaction.currency).to.eql('ZAR'); });",
-                  "pm.test('HTML was stripped from the notes', () => pm.expect(d.booking.notes).to.eql('Please use blue tones.'));"
+                  "pm.test('HTML was stripped from the notes', () => pm.expect(d.booking.notes).to.eql('Please use blue tones.'));",
+                  "pm.test('Booking starts as pending, not confirmed', () => pm.expect(d.booking.status).to.eql('pending'));",
+                  "pm.test('Transaction starts as pending', () => pm.expect(d.transaction.status).to.eql('pending'));",
+                  "pm.test('Message tells the client the freelancer must accept', () => pm.expect(pm.response.json().message).to.match(/must accept/i));"
                 ]
               }
             }
@@ -2101,6 +2104,447 @@
           }
         },
         {
+          "name": "Client A sends a second request with status \"confirmed\" - it is ignored (201, pending)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Supplied status is ignored - booking is pending', () => pm.expect(pm.response.json().data.booking.status).to.eql('pending'));",
+                  "pm.collectionVariables.set('rejectBookingId', pm.response.json().data.booking.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{claToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{gigId}}\",\n  \"status\": \"confirmed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Freelancer A sees the booking as pending (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Status is pending', () => pm.expect(pm.response.json().data.status).to.eql('pending'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}"
+          }
+        },
+        {
+          "name": "Client A pending transaction is not income yet (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Transaction is pending', () => { const t = pm.response.json().data.find(x => x.reference === pm.collectionVariables.get('txnRef')); pm.expect(t).to.exist; pm.expect(t.status).to.eql('pending'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{claToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions"
+          }
+        },
+        {
+          "name": "Freelancer A income is zero while the booking is pending (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Pending bookings add no income', () => { pm.expect(pm.response.json().data.totalIncome).to.eql(0); pm.expect(pm.response.json().data.transactionCount).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions/income"
+          }
+        },
+        {
+          "name": "Client cannot accept their own booking (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{claToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/accept"
+          }
+        },
+        {
+          "name": "Client cannot reject a booking (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{claToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/reject"
+          }
+        },
+        {
+          "name": "Admin cannot accept a booking (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/accept"
+          }
+        },
+        {
+          "name": "Accepting without a token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/accept"
+          }
+        },
+        {
+          "name": "Accepting with a malformed id (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/zzz/accept"
+          }
+        },
+        {
+          "name": "Accepting an unknown booking (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/64b7f0c2a1b2c3d4e5f60718/accept"
+          }
+        },
+        {
+          "name": "Freelancer B cannot accept it - not their booking (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flbToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/accept"
+          }
+        },
+        {
+          "name": "Freelancer B cannot reject it - not their booking (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flbToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/reject"
+          }
+        },
+        {
+          "name": "Freelancer A cannot complete a pending booking (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));",
+                  "pm.test('Message explains accepted is required', () => pm.expect(pm.response.json().message).to.match(/accepted/i));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/complete"
+          }
+        },
+        {
+          "name": "Freelancer A accepts the booking (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Status is accepted', () => pm.expect(pm.response.json().data.status).to.eql('accepted'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/accept"
+          }
+        },
+        {
+          "name": "Accepting twice is refused (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/accept"
+          }
+        },
+        {
+          "name": "Rejecting an accepted booking is refused (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/reject"
+          }
+        },
+        {
+          "name": "Freelancer A income is still zero while accepted (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Accepted but unfinished work is not income', () => pm.expect(pm.response.json().data.totalIncome).to.eql(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions/income"
+          }
+        },
+        {
           "name": "Client cannot mark a booking completed (403)",
           "event": [
             {
@@ -2160,7 +2604,8 @@
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
                   "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
-                  "pm.test('Status is completed', () => pm.expect(pm.response.json().data.status).to.eql('completed'));"
+                  "pm.test('Status is completed', () => pm.expect(pm.response.json().data.status).to.eql('completed'));",
+                  "pm.test('Booking was accepted first, so completing is allowed', () => pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('bookingId')));"
                 ]
               }
             }
@@ -2200,12 +2645,266 @@
             ],
             "url": "{{baseUrl}}/api/bookings/{{bookingId}}/complete"
           }
+        },
+        {
+          "name": "Accepting a completed booking is refused (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/accept"
+          }
+        },
+        {
+          "name": "Completed booking marks the transaction completed (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Transaction is completed', () => { const t = pm.response.json().data.find(x => x.reference === pm.collectionVariables.get('txnRef')); pm.expect(t).to.exist; pm.expect(t.status).to.eql('completed'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{claToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions"
+          }
+        },
+        {
+          "name": "Client cannot complete the second booking (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{claToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{rejectBookingId}}/complete"
+          }
+        },
+        {
+          "name": "Freelancer A cannot complete the second booking while pending (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{rejectBookingId}}/complete"
+          }
+        },
+        {
+          "name": "Freelancer A rejects the second booking (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Status is rejected', () => pm.expect(pm.response.json().data.status).to.eql('rejected'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{rejectBookingId}}/reject"
+          }
+        },
+        {
+          "name": "Rejecting twice is refused (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{rejectBookingId}}/reject"
+          }
+        },
+        {
+          "name": "Accepting a rejected booking is refused (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{rejectBookingId}}/accept"
+          }
+        },
+        {
+          "name": "Completing a rejected booking is refused (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Response success flag is false', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{flaToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings/{{rejectBookingId}}/complete"
+          }
+        },
+        {
+          "name": "Client A sees the rejected booking and its cancelled payment (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Rejected booking is listed as rejected', () => { const b = pm.response.json().data.find(x => x.id === pm.collectionVariables.get('rejectBookingId')); pm.expect(b).to.exist; pm.expect(b.status).to.eql('rejected'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{claToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/bookings"
+          }
+        },
+        {
+          "name": "Rejected booking has a cancelled transaction (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('One transaction is cancelled and one is completed', () => { const s = pm.response.json().data.map(t => t.status).sort(); pm.expect(s).to.eql(['cancelled', 'completed']); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{claToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions"
+          }
         }
       ]
     },
     {
       "name": "04 - Transactions and income tracking",
-      "description": "Payments are visible to their parties; income is tracked per freelancer.",
+      "description": "Payments are visible to their parties; income is tracked per freelancer and only counts bookings that were completed.",
       "item": [
         {
           "name": "Client A sees the payment (200)",
@@ -2234,7 +2933,7 @@
           }
         },
         {
-          "name": "Freelancer A sees the earning (200)",
+          "name": "Freelancer A sees the completed earning (200)",
           "event": [
             {
               "listen": "test",
@@ -2243,7 +2942,8 @@
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
                   "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
-                  "pm.test('Earning is listed', () => pm.expect(pm.response.json().data.map(t => t.reference)).to.include(pm.collectionVariables.get('txnRef')));"
+                  "pm.test('Earning is listed', () => pm.expect(pm.response.json().data.map(t => t.reference)).to.include(pm.collectionVariables.get('txnRef')));",
+                  "pm.test('Earning shows as completed', () => { const t = pm.response.json().data.find(x => x.reference === pm.collectionVariables.get('txnRef')); pm.expect(t.status).to.eql('completed'); });"
                 ]
               }
             }
@@ -2331,7 +3031,7 @@
           }
         },
         {
-          "name": "Freelancer A income summary (200)",
+          "name": "Freelancer A income counts only the completed booking (200)",
           "event": [
             {
               "listen": "test",
@@ -2344,7 +3044,8 @@
                   "pm.test('Total income equals the booked gig price', () => pm.expect(d.totalIncome).to.eql(price));",
                   "pm.test('Estimated tax = income x rate', () => pm.expect(d.estimatedTax).to.eql(r2(d.totalIncome * d.estimatedTaxRate)));",
                   "pm.test('Net income = income - tax', () => pm.expect(d.netIncome).to.eql(r2(d.totalIncome - d.estimatedTax)));",
-                  "pm.test('Breakdown by gig is included', () => { pm.expect(d.byGig).to.have.lengthOf(1); pm.expect(d.byGig[0].income).to.eql(price); pm.expect(d.byGig[0].bookings).to.eql(1); });"
+                  "pm.test('Breakdown by gig is included', () => { pm.expect(d.byGig).to.have.lengthOf(1); pm.expect(d.byGig[0].income).to.eql(price); pm.expect(d.byGig[0].bookings).to.eql(1); });",
+                  "pm.test('Pending, accepted and rejected requests are not counted', () => pm.expect(d.transactionCount).to.eql(1));"
                 ]
               }
             }
@@ -2550,7 +3251,8 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
                   "pm.test('Response success flag is true', () => pm.expect(pm.response.json().success).to.eql(true));",
                   "const d = pm.response.json().data;",
-                  "pm.test('Counts are present', () => { pm.expect(d.users.freelancers).to.be.at.least(2); pm.expect(d.transactions.count).to.be.at.least(1); pm.expect(d.transactions.totalValue).to.be.at.least(1); });"
+                  "pm.test('Counts are present', () => { pm.expect(d.users.freelancers).to.be.at.least(2); pm.expect(d.transactions.count).to.be.at.least(2); });",
+                  "pm.test('Transaction value only counts completed work', () => pm.expect(d.transactions.totalValue).to.eql(pm.collectionVariables.get('gigPrice')));"
                 ]
               }
             }
@@ -2670,7 +3372,7 @@
     },
     {
       "name": "06 - Rate limiting: bookings",
-      "description": "Each client may make 5 bookings per 10 minutes. The 6th is refused with a clear message.",
+      "description": "Each client may send 5 booking requests per 10 minutes. The 6th is refused with a clear message.",
       "item": [
         {
           "name": "Client B booking 1 of 5 (201)",

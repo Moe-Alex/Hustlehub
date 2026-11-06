@@ -31,7 +31,7 @@ describe('GigDetailPage', () => {
     api.bookings.create.mockReset();
   });
 
-  it('lets a client book, and confirms with the payment reference', async () => {
+  it('lets a client send a booking request and shows the pending payment reference', async () => {
     useAuth.mockReturnValue({ user: { id: 'c1', role: 'client' } });
     api.bookings.create.mockResolvedValue({ success: true, data: { booking: { id: 'b1' }, transaction: { amount: 450, reference: 'TXN-ABC123DEF4' } } });
     renderPage();
@@ -39,12 +39,15 @@ describe('GigDetailPage', () => {
     await screen.findByRole('heading', { name: 'Logo design' });
     const user = userEvent.setup();
     await user.type(screen.getByLabelText(/notes for the freelancer/i), 'Please use blue.');
-    await user.click(screen.getByRole('button', { name: 'Confirm booking' }));
+    expect(screen.queryByRole('button', { name: /^confirm/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Send booking request' }));
 
     expect(api.bookings.create).toHaveBeenCalledWith({ gigId: 'g1', notes: 'Please use blue.' });
-    expect(await screen.findByRole('heading', { name: 'Booking confirmed' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Booking request sent' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /confirmed/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/stays pending until the work is completed/i)).toBeInTheDocument();
     expect(screen.getByText('TXN-ABC123DEF4')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Confirm booking' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send booking request' })).not.toBeInTheDocument();
   });
 
   it('explains rate limiting when the client books too fast', async () => {
@@ -53,7 +56,7 @@ describe('GigDetailPage', () => {
     renderPage();
 
     await screen.findByRole('heading', { name: 'Logo design' });
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Confirm booking' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Send booking request' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/booking too quickly/i);
   });
@@ -63,7 +66,7 @@ describe('GigDetailPage', () => {
     renderPage();
 
     await screen.findByRole('heading', { name: 'Logo design' });
-    expect(screen.queryByRole('button', { name: 'Confirm booking' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send booking request' })).not.toBeInTheDocument();
     expect(screen.getByText(/only clients can book gigs/i)).toBeInTheDocument();
   });
 

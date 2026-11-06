@@ -1,4 +1,5 @@
-// A client's booking of a gig. The title and price are copied in at booking time so the
+// A client's booking request for a gig. It starts as 'pending'; only the freelancer can accept or
+// reject it, and only an accepted booking can be completed. The title and price are copied in at booking time so the
 // record stays accurate even if the gig is later edited or deleted.
 
 const mongoose = require('mongoose');
@@ -11,7 +12,7 @@ const bookingSchema = new mongoose.Schema(
     freelancer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     price: { type: Number, required: true, min: 0 },
     notes: { type: String, trim: true, maxlength: 500, default: '' },
-    status: { type: String, enum: ['confirmed', 'completed'], default: 'confirmed' },
+    status: { type: String, enum: ['pending', 'accepted', 'rejected', 'completed'], default: 'pending' },
   },
   { timestamps: true }
 );

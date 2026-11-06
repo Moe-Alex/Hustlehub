@@ -29,6 +29,20 @@ describe('api client', () => {
     await expect(api.gigs.create({})).rejects.toMatchObject({ status: 400, fieldErrors: { price: 'Price must be positive.' } });
   });
 
+  it('uses the accept, reject and complete endpoints for bookings', async () => {
+    fetch.mockResolvedValue(jsonResponse(200, { success: true, data: {} }));
+
+    await api.bookings.accept('b1');
+    await api.bookings.reject('b2');
+    await api.bookings.complete('b3');
+
+    expect(fetch.mock.calls.map(([url, options]) => `${options.method} ${url}`)).toEqual([
+      'PATCH /api/bookings/b1/accept',
+      'PATCH /api/bookings/b2/reject',
+      'PATCH /api/bookings/b3/complete',
+    ]);
+  });
+
   it('explains rate limiting and how long to wait', async () => {
     fetch.mockResolvedValue(jsonResponse(429, { success: false, message: 'You are booking too quickly.', retryAfterSeconds: 600 }));
 

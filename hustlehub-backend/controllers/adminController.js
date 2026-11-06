@@ -32,7 +32,7 @@ async function getSummary(req, res, next) {
       Gig.countDocuments(),
       Booking.countDocuments(),
       Transaction.countDocuments(),
-      Transaction.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
+      Transaction.aggregate([{ $match: { status: 'completed' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
     ]);
 
     return res.status(200).json({

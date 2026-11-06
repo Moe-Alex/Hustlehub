@@ -1,4 +1,6 @@
-// The payment created for every booking. Freelancer income is the sum of these.
+// The payment record created for every booking request. It stays 'pending' until the freelancer
+// completes the work ('completed'), or becomes 'cancelled' if the freelancer rejects the booking.
+// Freelancer income is the sum of completed transactions only.
 
 const mongoose = require('mongoose');
 
@@ -11,7 +13,7 @@ const transactionSchema = new mongoose.Schema(
     freelancer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     amount: { type: Number, required: true, min: 0 },
     currency: { type: String, default: 'ZAR' },
-    status: { type: String, enum: ['completed'], default: 'completed' },
+    status: { type: String, enum: ['pending', 'completed', 'cancelled'], default: 'pending' },
     reference: { type: String, required: true, unique: true },
   },
   { timestamps: true }

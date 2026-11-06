@@ -7,6 +7,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "seed:admin": "node scripts/seedAdmin.js",
+    "migrate:bookings": "node scripts/migrateBookingStatuses.js",
     "test": "node scripts/run-newman.js",
     "test:api": "node scripts/run-newman.js"
   },

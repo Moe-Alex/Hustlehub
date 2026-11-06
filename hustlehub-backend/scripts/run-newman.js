@@ -65,12 +65,27 @@ function runNewman() {
     '--env-var', `adminEmail=${ADMIN.email}`,
     '--env-var', `adminPassword=${ADMIN.password}`,
     '--insecure', // the API uses a self-signed certificate
+    '--timeout-request', '15000', // a stuck request fails the run instead of hanging it
     '-r', 'cli,htmlextra,json',
     '--reporter-htmlextra-export', 'newman/reports/newman-report.html',
     '--reporter-htmlextra-title', 'HustleHub+ API test report',
     '--reporter-json-export', 'newman/reports/newman-report.json',
   ];
   return spawnSync('npx', args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+}
+
+// Reads the JSON report and prints one clear line, so the result is easy to quote in evidence.
+// A run that executed nothing is treated as a failure, so a broken setup can never look like a pass.
+function summarise() {
+  try {
+    const report = JSON.parse(fs.readFileSync(path.join(ROOT, 'newman', 'reports', 'newman-report.json'), 'utf8'));
+    const { requests, assertions } = report.run.stats;
+    console.log(`\n[newman] Summary: ${requests.total} requests, ${assertions.total} assertions, ${assertions.failed} failed.`);
+    return requests.total > 0 && assertions.total > 0;
+  } catch (err) {
+    console.error(`[newman] Could not read the report: ${err.message}`);
+    return false;
+  }
 }
 
 async function main() {
@@ -90,6 +105,7 @@ async function main() {
     await waitForApi();
     const result = runNewman();
     exitCode = result.status === null ? 1 : result.status;
+    if (!summarise()) exitCode = 1;
   } catch (err) {
     console.error(`[newman] ${err.message}`);
   } finally {
