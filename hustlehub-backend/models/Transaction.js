@@ -15,6 +15,8 @@ const transactionSchema = new mongoose.Schema(
     currency: { type: String, default: 'ZAR' },
     status: { type: String, enum: ['pending', 'completed', 'cancelled'], default: 'pending' },
     reference: { type: String, required: true, unique: true },
+    // When the work was completed. Income counts in the tax year of this date, not of the booking date.
+    completedAt: { type: Date },
   },
   { timestamps: true }
 );

@@ -3,6 +3,7 @@
 
 const { body, param, query, validationResult } = require('express-validator');
 const { SELF_REGISTER_ROLES, GIG_CATEGORIES } = require('../config/constants');
+const { TAX_TABLES, AGE_GROUPS } = require('../config/taxTables');
 
 const registerRules = [
   body('username')
@@ -108,6 +109,13 @@ const pageQueryRules = [
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('limit must be between 1 and 100.').toInt(),
 ];
 
+// Options for the income and tax estimate. All are optional; the defaults are the current tax year, under 65, no expenses.
+const incomeQueryRules = [
+  query('taxYear').optional().isIn(Object.keys(TAX_TABLES)).withMessage('Unknown tax year.').toInt(),
+  query('ageGroup').optional().isIn(AGE_GROUPS).withMessage('Unknown age group.'),
+  query('expenses').optional().isFloat({ min: 0, max: 100000000 }).withMessage('Expenses must be zero or more.').toFloat(),
+];
+
 // Runs after the rules above - returns a clean 400 with field-level messages if anything failed.
 function handleValidationErrors(req, res, next) {
   const errors = validationResult(req);
@@ -131,5 +139,6 @@ module.exports = {
   idParamRule,
   gigListQueryRules,
   pageQueryRules,
+  incomeQueryRules,
   handleValidationErrors,
 };
