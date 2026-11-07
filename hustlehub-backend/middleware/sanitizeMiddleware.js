@@ -30,8 +30,10 @@ function sanitizeValue(value) {
 function sanitizeObject(target) {
   Object.keys(target).forEach((key) => {
     if (isUnsafeKey(key)) {
+      // eslint-disable-next-line security/detect-object-injection -- unsafe keys (__proto__, constructor, $ and . names) are removed first; this only touches keys of the same object
       delete target[key];
     } else if (!SKIP_FIELDS.has(key)) {
+      // eslint-disable-next-line security/detect-object-injection -- unsafe keys (__proto__, constructor, $ and . names) are removed first; this only touches keys of the same object
       target[key] = sanitizeValue(target[key]);
     }
   });

@@ -19,3 +19,6 @@ newman/reports/*
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
+
+# Test coverage output
+coverage/

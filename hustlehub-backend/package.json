@@ -1,7 +1,7 @@
 {
   "name": "hustlehub-backend",
   "version": "1.0.0",
-  "description": "HustleHub+ Part 2 - Secure Stack backend (Node.js, Express, MongoDB, JWT, RBAC)",
+  "description": "HustleHub+ - secure freelancer marketplace API (Node.js, Express, MongoDB, JWT, RBAC, tax estimation, structured logging)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,7 +9,11 @@
     "seed:admin": "node scripts/seedAdmin.js",
     "migrate:bookings": "node scripts/migrateBookingStatuses.js",
     "test": "node scripts/run-newman.js",
-    "test:api": "node scripts/run-newman.js"
+    "test:api": "node scripts/run-newman.js",
+    "test:unit": "node --test \"tests/**/*.test.js\"",
+    "test:all": "npm run test:unit && npm run test:api",
+    "lint": "eslint . --max-warnings 0",
+    "test:coverage": "node -e \"require('fs').mkdirSync('coverage',{recursive:true})\" && node --test --experimental-test-coverage --test-coverage-exclude=\"tests/**\" --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info \"tests/**/*.test.js\""
   },
   "keywords": [
     "hustlehub",
@@ -29,7 +33,6 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.11.0",
-    "morgan": "^1.10.0",
     "xss": "^1.0.15"
   },
   "overrides": {
@@ -37,5 +40,11 @@
   },
   "engines": {
     "node": ">=20.19.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-plugin-security": "^4.2.1",
+    "globals": "^17.14.0"
   }
 }
