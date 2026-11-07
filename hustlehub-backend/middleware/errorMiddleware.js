@@ -27,7 +27,9 @@ function errorHandler(err, req, res, next) {
   const { status, message } = describeError(err, res);
 
   // Full detail (including stack trace) - server-side log only.
-  logger.error(`${req.method} ${req.originalUrl} -> ${err.stack || err.message}`);
+  // Client mistakes (400s, 404s) are logged as warnings; real server faults (500) as errors.
+  const log = status >= 500 ? logger.error : logger.warn;
+  log('error.request', { requestId: req.id, method: req.method, path: req.baseUrl + req.path, status, errorName: err.name, message: err.message, stack: status >= 500 ? err.stack : undefined, userId: req.user ? req.user.id : undefined });
 
   res.status(status).json({ success: false, message });
 }

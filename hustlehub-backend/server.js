@@ -8,6 +8,7 @@ const { connectDB, disconnectDB } = require('./config/db');
 const logger = require('./utils/logger');
 
 async function startServer() {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- certificate paths come from the server's own configuration (.env), not from requests
   const certsExist = fs.existsSync(config.sslKeyPath) && fs.existsSync(config.sslCertPath);
 
   if (!certsExist) {
@@ -24,19 +25,23 @@ async function startServer() {
   await connectDB();
 
   const httpsOptions = {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- certificate paths come from the server's own configuration (.env), not from requests
     key: fs.readFileSync(config.sslKeyPath),
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- certificate paths come from the server's own configuration (.env), not from requests
     cert: fs.readFileSync(config.sslCertPath),
   };
 
   const server = https.createServer(httpsOptions, app).listen(config.port, () => {
-    logger.info(`HustleHub+ backend listening securely on https://localhost:${config.port} (${config.nodeEnv})`);
+    logger.info('system.startup', { port: config.port, environment: config.nodeEnv, cloudLogging: logger.cloudEnabled });
+    console.log(`HustleHub+ backend listening securely on https://localhost:${config.port} (${config.nodeEnv})`);
   });
 
   // Close the server and database cleanly on Ctrl+C or a stop signal.
   const shutdown = (signal) => {
-    logger.info(`${signal} received - shutting down`);
+    logger.info('system.shutdown', { signal });
     server.close(async () => {
       await disconnectDB();
+      await logger.close(); // send any log lines still waiting for the cloud
       process.exit(0);
     });
   };
@@ -45,6 +50,6 @@ async function startServer() {
 }
 
 startServer().catch((err) => {
-  logger.error(`Startup failed: ${err.name}: ${err.message}`);
-  process.exit(1);
+  logger.error('system.startup.failed', { errorName: err.name, message: err.message });
+  logger.close().finally(() => process.exit(1));
 });

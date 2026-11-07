@@ -14,7 +14,7 @@ async function connectDB() {
     dbName: config.mongoDbName,
     serverSelectionTimeoutMS: 10000,
   });
-  logger.info(`MongoDB connected (database: ${mongoose.connection.name})`);
+  logger.info('system.database.connected', { database: mongoose.connection.name });
 }
 
 async function disconnectDB() {

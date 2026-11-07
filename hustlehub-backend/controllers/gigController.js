@@ -31,6 +31,7 @@ async function listGigs(req, res, next) {
     if (Object.keys(price).length > 0) filter.price = mongoose.trusted(price);
 
     if (q) {
+      // eslint-disable-next-line security/detect-non-literal-regexp -- the search text is escaped by escapeRegex() first, so it cannot add regex syntax
       const pattern = new RegExp(escapeRegex(q), 'i');
       filter.$or = [
         { title: mongoose.trusted({ $regex: pattern }) },
@@ -39,6 +40,7 @@ async function listGigs(req, res, next) {
     }
 
     const [gigs, total] = await Promise.all([
+      // eslint-disable-next-line security/detect-object-injection -- sort is checked against a fixed list by the validator (isIn)
       Gig.find(filter).sort(SORT_OPTIONS[sort]).skip(pagination.skip).limit(pagination.limit).populate('freelancer', 'username'),
       Gig.countDocuments(filter),
     ]);
@@ -93,7 +95,7 @@ async function createGig(req, res, next) {
     });
     await gig.populate('freelancer', 'username');
 
-    logger.info(`Gig created: "${gig.title}" by ${req.user.email}`);
+    logger.info('gig.created', { requestId: req.id, gigId: gig.id, userId: req.user.id, price: gig.price });
     return res.status(201).json({ success: true, message: 'Gig created.', data: gig });
   } catch (err) {
     return next(err);
@@ -108,7 +110,7 @@ async function updateGig(req, res, next) {
       return res.status(404).json({ success: false, message: 'Gig not found.' });
     }
     if (!ownsGig(gig, req.user)) {
-      logger.warn(`Blocked: ${req.user.email} tried to edit gig ${gig.id} owned by someone else`);
+      logger.warn('access.denied', { requestId: req.id, reason: 'edit_gig_not_owner', gigId: gig.id, userId: req.user.id, role: req.user.role });
       return res.status(403).json({ success: false, message: 'You can only modify your own gigs.' });
     }
 
@@ -124,7 +126,7 @@ async function updateGig(req, res, next) {
     await gig.save();
     await gig.populate('freelancer', 'username');
 
-    logger.info(`Gig updated: ${gig.id} by ${req.user.email}`);
+    logger.info('gig.updated', { requestId: req.id, gigId: gig.id, userId: req.user.id });
     return res.status(200).json({ success: true, message: 'Gig updated.', data: gig });
   } catch (err) {
     return next(err);
@@ -139,12 +141,12 @@ async function deleteGig(req, res, next) {
       return res.status(404).json({ success: false, message: 'Gig not found.' });
     }
     if (!ownsGig(gig, req.user) && req.user.role !== ROLES.ADMIN) {
-      logger.warn(`Blocked: ${req.user.email} tried to delete gig ${gig.id} owned by someone else`);
+      logger.warn('access.denied', { requestId: req.id, reason: 'delete_gig_not_owner', gigId: gig.id, userId: req.user.id, role: req.user.role });
       return res.status(403).json({ success: false, message: 'You can only delete your own gigs.' });
     }
 
     await gig.deleteOne();
-    logger.info(`Gig deleted: ${gig.id} by ${req.user.email} (${req.user.role})`);
+    logger.info('gig.deleted', { requestId: req.id, gigId: gig.id, userId: req.user.id, role: req.user.role });
     return res.status(200).json({ success: true, message: 'Gig deleted.' });
   } catch (err) {
     return next(err);

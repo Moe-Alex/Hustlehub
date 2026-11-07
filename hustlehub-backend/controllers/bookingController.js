@@ -55,7 +55,8 @@ async function createBooking(req, res, next) {
       throw err;
     }
 
-    logger.info(`Booking ${booking.id} created by ${req.user.email}; transaction ${transaction.reference} for R${transaction.amount}`);
+    logger.info('booking.created', { requestId: req.id, bookingId: booking.id, gigId: gig.id, clientId: req.user.id, freelancerId: String(gig.freelancer), amount: booking.price });
+    logger.info('transaction.created', { requestId: req.id, reference: transaction.reference, bookingId: booking.id, amount: transaction.amount, status: transaction.status });
     return res.status(201).json({
       success: true,
       message: 'Booking request sent. The freelancer must accept it before work starts.',
@@ -120,14 +121,19 @@ async function transition(req, res, next, { from, to, transactionStatus, refusal
 
     if (transactionStatus) {
       try {
-        await Transaction.updateOne({ booking: booking._id }, { status: transactionStatus });
+        const update = { status: transactionStatus };
+        if (transactionStatus === 'completed') update.completedAt = new Date(); // the moment the income is earned
+        await Transaction.updateOne({ booking: booking._id }, update);
       } catch (err) {
         await Booking.updateOne({ _id: booking._id }, { status: from }); // keep booking and payment in step
         throw err;
       }
     }
 
-    logger.info(`Booking ${booking.id} ${logLine} by ${req.user.email}`);
+    logger.info(`booking.${logLine}`, { requestId: req.id, bookingId: booking.id, freelancerId: req.user.id });
+    if (transactionStatus) {
+      logger.info(`transaction.${transactionStatus}`, { requestId: req.id, bookingId: booking.id, amount: booking.price });
+    }
     return res.status(200).json({ success: true, message: success, data: booking });
   } catch (err) {
     return next(err);

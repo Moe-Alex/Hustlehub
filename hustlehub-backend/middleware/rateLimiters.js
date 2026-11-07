@@ -6,6 +6,7 @@ const config = require('../config/config');
 const logger = require('../utils/logger');
 
 function createLimiter({ name, message, keyByUser = false, skipSuccessfulRequests = false }) {
+  // eslint-disable-next-line security/detect-object-injection -- name is a fixed string written in this file
   const { windowMs, max } = config.rateLimits[name];
 
   return rateLimit({
@@ -18,7 +19,7 @@ function createLimiter({ name, message, keyByUser = false, skipSuccessfulRequest
     ...(keyByUser && { keyGenerator: (req) => `user:${req.user.id}` }),
     handler: (req, res) => {
       const retryAfterSeconds = Math.max(1, Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000));
-      logger.warn(`Rate limit hit (${name}) on ${req.method} ${req.originalUrl}`);
+      logger.warn('security.rate_limit.exceeded', { requestId: req.id, limiter: name, method: req.method, path: req.baseUrl + req.path, userId: req.user ? req.user.id : undefined });
       res.status(429).json({ success: false, message, retryAfterSeconds });
     },
   });
