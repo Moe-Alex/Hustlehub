@@ -184,3 +184,34 @@ a:hover { color: var(--jacaranda-dark); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- Income and tax dashboard ---------- */
+.income-controls { display: flex; flex-wrap: wrap; gap: 1rem 1.25rem; align-items: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+.income-controls .field { min-width: 170px; flex: 1 1 170px; }
+.income-controls .btn { align-self: flex-end; margin-bottom: 1.6rem; }
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem; margin: 1.25rem 0 0.5rem; }
+.chart { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.25rem; }
+.chart-title { font-family: var(--font-display); font-weight: 650; margin-bottom: 0.75rem; }
+.chart svg { display: block; width: 100%; height: auto; }
+.gridline { stroke: var(--line); stroke-width: 1; }
+.axis-text { fill: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
+.bar { fill: var(--jacaranda); }
+.split-svg { height: 2.25rem; border-radius: 6px; overflow: hidden; }
+.seg-takehome { fill: var(--leaf); background: var(--leaf); }
+.seg-tax { fill: var(--gold); background: var(--gold); }
+.seg-expenses { fill: var(--ink-soft); background: var(--ink-soft); }
+.legend { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
+.legend li { display: flex; align-items: center; gap: 0.6rem; }
+.legend-label { flex: 1; }
+.legend-value { font-variant-numeric: tabular-nums; font-weight: 600; }
+.legend-value small { color: var(--ink-soft); font-weight: 500; }
+.swatch { width: 0.9rem; height: 0.9rem; border-radius: 3px; flex: none; }
+.inline-bar { display: block; width: 100%; max-width: 220px; height: 6px; margin-top: 0.35rem; }
+.table tfoot th, .table tfoot td { border-top: 1px solid var(--line); border-bottom: 0; font-weight: 600; }
+.table tfoot th { text-align: left; color: var(--ink); font-size: 1rem; }
+.table .total-row th, .table .total-row td { font-family: var(--font-display); font-size: 1.1rem; }
+
+/* ---------- Inactivity warning ---------- */
+.timeout-overlay { position: fixed; inset: 0; background: rgba(27, 24, 48, 0.6); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50; }
+.timeout-dialog { background: var(--surface); border-radius: 12px; border-top: 6px solid var(--gold); max-width: 28rem; width: 100%; padding: 1.5rem; box-shadow: 0 12px 40px rgba(27, 24, 48, 0.35); }
+.timeout-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; }
