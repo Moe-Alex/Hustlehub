@@ -113,7 +113,10 @@ async function main() {
   } catch (err) {
     console.error(`[newman] ${err.message}`);
   } finally {
+    // Stop the API and wait for it to finish, so that the coverage it records on exit (used by "npm run test:coverage") is written first.
+    const stopped = new Promise((resolve) => server.once('exit', resolve));
     server.kill();
+    if (server.exitCode === null) await Promise.race([stopped, new Promise((resolve) => setTimeout(resolve, 5000))]);
   }
 
   console.log(exitCode === 0 ? '\n[newman] All tests passed. Reports: newman/reports/' : '\n[newman] Some tests failed. See output above.');

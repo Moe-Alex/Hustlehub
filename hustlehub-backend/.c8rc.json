@@ -1,0 +1,17 @@
+{
+  "all": true,
+  "src": ["."],
+  "exclude": [
+    "tests/**",
+    "scripts/**",
+    "postman/**",
+    "newman/**",
+    "coverage/**",
+    "certs/**",
+    "logs/**",
+    "eslint.config.js"
+  ],
+  "reporter": ["lcov", "text-summary"],
+  "reports-dir": "coverage",
+  "temp-directory": "coverage/tmp"
+}
