@@ -5,7 +5,7 @@ const express = require('express');
 const { registerRules, loginRules, handleValidationErrors } = require('../middleware/validationMiddleware');
 const { protect } = require('../middleware/authMiddleware');
 const { loginLimiter, registerLimiter } = require('../middleware/rateLimiters');
-const { registerUser, loginUser, getProfile } = require('../controllers/authController');
+const { registerUser, loginUser, logoutUser, getProfile } = require('../controllers/authController');
 
 const router = express.Router();
 
@@ -13,7 +13,8 @@ const router = express.Router();
 router.post('/register', registerLimiter, registerRules, handleValidationErrors, registerUser);
 router.post('/login', loginLimiter, loginRules, handleValidationErrors, loginUser);
 
-// Protected route - demonstrates JWT is required and validated beyond login.
+// Protected routes - the JWT is required and validated.
 router.get('/profile', protect, getProfile);
+router.post('/logout', protect, logoutUser); // ends the session on the server
 
 module.exports = router;

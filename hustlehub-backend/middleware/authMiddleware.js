@@ -25,11 +25,17 @@ async function protect(req, res, next) {
       return res.status(401).json({ success: false, message: 'Not authorised. Account no longer exists.' });
     }
 
+    // Logging out raises the user's tokenVersion, so a token issued before that no longer works (it may have been stolen).
+    if ((decoded.tv || 0) !== user.tokenVersion) {
+      logger.warn('security.token.revoked', { requestId: req.id, userId: user.id, path: req.baseUrl + req.path });
+      return res.status(401).json({ success: false, message: 'Not authorised. Your session has ended. Please log in again.' });
+    }
+
     req.user = { id: user.id, username: user.username, email: user.email, role: user.role };
     return next();
   } catch (err) {
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError' || err.name === 'NotBeforeError') {
-      logger.warn(`Rejected request with invalid/expired token: ${err.message}`);
+      logger.warn('security.token.rejected', { requestId: req.id, reason: err.name, path: req.baseUrl + req.path });
       return res.status(401).json({ success: false, message: 'Not authorised. Token is invalid or has expired.' });
     }
     return next(err); // anything else (e.g. database down) is a real server error
@@ -40,7 +46,7 @@ async function protect(req, res, next) {
 function requireRole(...allowedRoles) {
   return (req, res, next) => {
     if (!req.user || !allowedRoles.includes(req.user.role)) {
-      logger.warn(`Forbidden: ${req.user ? req.user.role : 'anonymous'} tried ${req.method} ${req.originalUrl}`);
+      logger.warn('security.access.forbidden', { requestId: req.id, role: req.user ? req.user.role : 'anonymous', method: req.method, path: req.baseUrl + req.path, userId: req.user ? req.user.id : undefined });
       return res.status(403).json({ success: false, message: 'You do not have permission to perform this action.' });
     }
     return next();

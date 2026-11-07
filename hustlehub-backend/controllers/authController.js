@@ -1,11 +1,14 @@
-// Handles registration and login. Input is already validated and sanitised before it reaches here.
+// Handles registration, login, logout and the profile. Input is already validated and sanitised before it reaches here.
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const config = require('../config/config');
 const logger = require('../utils/logger');
+const { maskEmail } = require('../utils/redact');
+const { secondsLocked, recordFailure, clearFailures } = require('../utils/accountLockout');
 const { ROLES } = require('../config/constants');
+const { formatWaitMinutes } = require('../utils/wait');
 
 const SALT_ROUNDS = 12;
 
@@ -15,8 +18,9 @@ const DUMMY_HASH = '$2a$12$Og9h8pnqwRF6tbhvgcq0o.p6XBr6vXgTUN2IeVZ/yBEuRvkH5xQ9y
 
 function generateToken(user) {
   // Payload stays minimal - never put passwords in a JWT, it's only base64 encoded, not encrypted.
+  // "tv" is the token version: logging out raises the user's version and so ends every older token.
   return jwt.sign(
-    { id: user.id, username: user.username, role: user.role },
+    { id: user.id, username: user.username, role: user.role, tv: user.tokenVersion || 0 },
     config.jwtSecret,
     { algorithm: 'HS256', expiresIn: config.jwtExpiresIn }
   );
@@ -28,12 +32,12 @@ async function registerUser(req, res, next) {
     const { username, email, password, role } = req.body;
 
     if (await User.exists({ email })) {
-      logger.warn(`Registration blocked - email already in use: ${email}`);
+      logger.warn('auth.register.blocked', { requestId: req.id, reason: 'email_in_use', email: maskEmail(email) });
       return res.status(409).json({ success: false, message: 'An account with that email already exists.' });
     }
 
     if (await User.exists({ usernameLower: username.toLowerCase() })) {
-      logger.warn(`Registration blocked - username already taken: ${username}`);
+      logger.warn('auth.register.blocked', { requestId: req.id, reason: 'username_taken' });
       return res.status(409).json({ success: false, message: 'That username is already taken.' });
     }
 
@@ -41,7 +45,7 @@ async function registerUser(req, res, next) {
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
     const newUser = await User.create({ username, email, password: hashedPassword, role: role || ROLES.CLIENT });
 
-    logger.info(`New user registered: ${newUser.email} (role: ${newUser.role})`);
+    logger.info('auth.register.success', { requestId: req.id, userId: newUser.id, role: newUser.role });
 
     return res.status(201).json({
       success: true,
@@ -57,6 +61,18 @@ async function registerUser(req, res, next) {
 async function loginUser(req, res, next) {
   try {
     const { email, password } = req.body;
+
+    // Locked accounts are refused before any password is checked, so a guesser learns nothing more by trying.
+    const lockedFor = await secondsLocked(email);
+    if (lockedFor > 0) {
+      logger.warn('auth.login.blocked', { requestId: req.id, reason: 'account_locked', email: maskEmail(email), retryAfterSeconds: lockedFor });
+      return res.set('Retry-After', String(lockedFor)).status(429).json({
+        success: false,
+        message: `Too many failed attempts for this account. It is locked for ${formatWaitMinutes(lockedFor)}.`,
+        retryAfterSeconds: lockedFor,
+      });
+    }
+
     const user = await User.findOne({ email }).select('+password');
 
     // Same generic message for "no such user" and "wrong password" - stops attackers figuring out which emails are registered.
@@ -64,17 +80,18 @@ async function loginUser(req, res, next) {
 
     const passwordMatches = await bcrypt.compare(password, user ? user.password : DUMMY_HASH);
 
-    if (!user) {
-      logger.warn(`Login attempt for non-existent email: ${email}`);
-      return invalidCredentials();
-    }
-    if (!passwordMatches) {
-      logger.warn(`Failed login attempt for: ${email}`);
+    if (!user || !passwordMatches) {
+      const failure = await recordFailure(email);
+      logger.warn('auth.login.failure', { requestId: req.id, reason: user ? 'wrong_password' : 'unknown_email', email: maskEmail(email), ip: req.ip });
+      if (failure.locked) {
+        logger.warn('security.account.locked', { requestId: req.id, email: maskEmail(email), minutes: config.lockout.minutes });
+      }
       return invalidCredentials();
     }
 
+    await clearFailures(email);
     const token = generateToken(user);
-    logger.info(`Successful login: ${user.email}`);
+    logger.info('auth.login.success', { requestId: req.id, userId: user.id, role: user.role });
 
     return res.status(200).json({
       success: true,
@@ -84,6 +101,18 @@ async function loginUser(req, res, next) {
         user: { id: user.id, username: user.username, email: user.email, role: user.role },
       },
     });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+// POST /api/auth/logout - ends the session on the server too, not just in the browser.
+// Raising the token version makes every token issued so far invalid, including one that was stolen.
+async function logoutUser(req, res, next) {
+  try {
+    await User.updateOne({ _id: req.user.id }, { $inc: { tokenVersion: 1 } });
+    logger.info('auth.logout', { requestId: req.id, userId: req.user.id, role: req.user.role });
+    return res.status(200).json({ success: true, message: 'Logged out. Your sessions have ended.' });
   } catch (err) {
     return next(err);
   }
@@ -105,4 +134,4 @@ async function getProfile(req, res, next) {
   }
 }
 
-module.exports = { registerUser, loginUser, getProfile };
+module.exports = { registerUser, loginUser, logoutUser, getProfile };

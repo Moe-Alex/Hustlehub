@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, select: false },
     role: { type: String, enum: Object.values(ROLES), default: ROLES.CLIENT },
+    // Raised on logout. Tokens carry the version they were issued with, so raising it ends every session at once.
+    tokenVersion: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
@@ -27,6 +29,7 @@ userSchema.set('toJSON', {
     delete ret._id;
     delete ret.password;
     delete ret.usernameLower;
+    delete ret.tokenVersion;
     return ret;
   },
 });
