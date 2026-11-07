@@ -31,7 +31,10 @@ export default function GigForm({ initial, submitLabel, onSubmit, submitting = f
     });
   }
 
+  // field is always a form field name written in this file, never text from a user.
+  /* eslint-disable security/detect-object-injection */
   const errorFor = (field) => errors[field] || serverErrors[field];
+  /* eslint-enable security/detect-object-injection */
 
   return (
     <form className="form" onSubmit={handleSubmit} noValidate>

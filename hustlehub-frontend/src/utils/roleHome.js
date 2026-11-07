@@ -7,4 +7,5 @@ const HOME_BY_ROLE = {
   admin: '/admin',
 };
 
-export const homeFor = (role) => HOME_BY_ROLE[role] || '/gigs';
+// eslint-disable-next-line security/detect-object-injection -- guarded by Object.hasOwn
+export const homeFor = (role) => (Object.hasOwn(HOME_BY_ROLE, role) ? HOME_BY_ROLE[role] : '/gigs');

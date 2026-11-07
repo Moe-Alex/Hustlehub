@@ -8,6 +8,8 @@ export function useApi(call, deps = []) {
 
   useEffect(() => {
     let cancelled = false;
+    // The loading flag has to switch back on whenever the request changes or is reloaded, which can only be done here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-on-change pattern; state is reset, not derived
     setState((previous) => ({ ...previous, error: null, loading: true }));
     call()
       .then((res) => !cancelled && setState({ data: res, error: null, loading: false }))

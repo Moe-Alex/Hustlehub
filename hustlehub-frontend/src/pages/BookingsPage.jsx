@@ -28,6 +28,8 @@ export default function BookingsPage() {
   async function handleAction(action, id) {
     setActionError('');
     try {
+      // action is 'accept', 'reject' or 'complete', written in this file next to the buttons.
+      // eslint-disable-next-line security/detect-object-injection -- fixed action names
       await api.bookings[action](id);
       reload();
     } catch (err) {

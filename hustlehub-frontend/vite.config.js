@@ -8,9 +8,12 @@ import react from '@vitejs/plugin-react';
 const certDir = fileURLToPath(new URL('../hustlehub-backend/certs/', import.meta.url));
 const keyFile = `${certDir}key.pem`;
 const certFile = `${certDir}cert.pem`;
+// The paths are fixed relative to this file, not user input.
+/* eslint-disable security/detect-non-literal-fs-filename */
 const https = fs.existsSync(keyFile) && fs.existsSync(certFile)
   ? { key: fs.readFileSync(keyFile), cert: fs.readFileSync(certFile) }
   : undefined;
+/* eslint-enable security/detect-non-literal-fs-filename */
 
 // The browser only talks to this server; /api calls are forwarded to the backend.
 // "secure: false" accepts the backend's self-signed certificate (local development only).
@@ -51,5 +54,11 @@ export default defineConfig({
     globals: true,
     setupFiles: './src/test/setup.js',
     css: false,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      include: ['src/**/*.{js,jsx}'],
+      exclude: ['src/**/*.test.{js,jsx}', 'src/test/**', 'src/main.jsx'],
+    },
   },
 });
