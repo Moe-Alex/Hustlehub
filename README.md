@@ -874,9 +874,9 @@ Every layer of the application has automated tests, and all of them run in the p
 
 | Layer | Tool | What it covers | Latest result |
 |---|---|---|---|
-| Backend unit tests | Node's built-in test runner (`node:test`) | Tax engine (12), log redaction (5), Loki sender (7), structured logger (6) | **30 tests, 0 failed** (about 99% line coverage of the units tested) |
+| Backend unit tests | Node's built-in test runner (`node:test`) | Tax engine (12), log redaction (5), Loki sender (7), structured logger (6) | **30 tests, 0 failed**. Together with the Newman API tests below, the backend has about 96% line coverage |
 | Backend integration tests | Postman collection run by Newman | Every endpoint, roles, ownership, validation, injection, tokens, rate limits, lockout, sessions, headers, CORS | **165 requests, 416 assertions, 0 failed** |
-| Frontend unit and integration tests | Vitest and Testing Library | Pages, forms, routing by role, API client, charts, income page, sessions, inactivity sign-out | **85 tests in 15 files, 0 failed** (about 92% statement coverage) |
+| Frontend unit and integration tests | Vitest and Testing Library | Pages, forms, routing by role, API client, charts, income page, sessions, inactivity sign-out | **85 tests in 15 files, 0 failed** (about 81% line coverage across all source files) |
 | End-to-end browser tests | Playwright (Chromium) against the Docker stack | Register, log in, create a gig, book, accept, complete, income and tax page, role access, logout revocation, account lockout, admin | **9 tests, 0 failed** |
 | Static analysis | ESLint with security rules, SonarQube | Whole codebase | See section 13.3 |
 
@@ -885,8 +885,8 @@ Every layer of the application has automated tests, and all of them run in the p
 ```bash
 cd hustlehub-backend
 npm run test:unit      # unit tests
-npm run test:coverage  # unit tests with a coverage report
-npm run test:api       # Newman API tests (same as npm test)
+npm run test:coverage  # unit tests, then the Newman API tests, with one combined coverage report
+npm run test:api       # Newman API tests only (same as npm test)
 npm run lint           # static analysis
 ```
 
@@ -965,7 +965,7 @@ flowchart LR
 
 | Job | What it does | Fails when |
 |---|---|---|
-| **backend** | Installs dependencies with `npm ci`, starts a MongoDB service container, creates a throw-away JWT secret and certificate, runs ESLint, the unit tests with coverage and the Newman API tests, and uploads the coverage and the Newman HTML report | A lint error or warning, a failing unit test, a failing Newman assertion |
+| **backend** | Installs dependencies with `npm ci`, starts a MongoDB service container, creates a throw-away JWT secret and certificate, runs ESLint, then the unit tests and the Newman API tests together with a coverage report that also measures the API server while Newman calls it, and uploads the coverage and the Newman HTML report | A lint error or warning, a failing unit test, a failing Newman assertion |
 | **frontend** | `npm ci`, ESLint, Vitest with coverage, then the production build, and uploads the coverage and the built site | A lint error, a failing test, a failed build |
 | **dependency-audit** | `npm audit --audit-level=high` for the backend, frontend and end-to-end packages | A high or critical known vulnerability |
 | **trivy-scan** | Trivy scans the repository for vulnerable dependencies, committed secrets and Dockerfile misconfigurations (Aqua Security 2026) | A high or critical finding |
