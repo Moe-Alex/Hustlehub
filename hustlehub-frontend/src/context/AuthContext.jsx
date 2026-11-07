@@ -10,7 +10,10 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(Boolean(tokenStore.get()));
   const [sessionMessage, setSessionMessage] = useState('');
 
-  const logout = useCallback((message = '') => {
+  // revoke: also tell the server to end the session, so a copied token stops working. This is best effort -
+  // if the server cannot be reached the person is still logged out in this browser.
+  const endSession = useCallback((message = '', revoke = false) => {
+    if (revoke && tokenStore.get()) api.auth.logout().catch(() => {});
     tokenStore.clear();
     setUser(null);
     setSessionMessage(message);
@@ -18,8 +21,8 @@ export function AuthProvider({ children }) {
 
   // If any request comes back 401 while logged in, the session has expired.
   useEffect(() => {
-    setUnauthorizedHandler(() => logout('Your session has expired. Please log in again.'));
-  }, [logout]);
+    setUnauthorizedHandler(() => endSession('Your session has expired. Please log in again.'));
+  }, [endSession]);
 
   // On first load, check a stored token is still valid.
   useEffect(() => {
@@ -42,8 +45,18 @@ export function AuthProvider({ children }) {
   const register = useCallback((details) => api.auth.register(details), []);
 
   const value = useMemo(
-    () => ({ user, loading, sessionMessage, login, register, logout: () => logout('') }),
-    [user, loading, sessionMessage, login, register, logout]
+    () => ({
+      user,
+      loading,
+      sessionMessage,
+      login,
+      register,
+      // Log out button: ends the session on the server as well.
+      logout: () => endSession('', true),
+      // Used by the inactivity timer: same, but explains why the person was signed out.
+      expireSession: (message) => endSession(message, true),
+    }),
+    [user, loading, sessionMessage, login, register, endSession]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
