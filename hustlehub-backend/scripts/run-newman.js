@@ -9,12 +9,14 @@ const { spawn, spawnSync } = require('child_process');
 const https = require('https');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const ROOT = path.join(__dirname, '..');
 const PORT = process.env.NEWMAN_PORT || '5055';
 const TEST_DB = process.env.NEWMAN_DB_NAME || 'hustlehub_test';
-const ADMIN = { username: 'newman_admin', email: 'newman_admin@hustlehub.test', password: 'Newman_Admin_Pass1!' };
+// A new random password for the throw-away test admin on every run, so no password is written in the code.
+const ADMIN = { username: 'newman_admin', email: 'newman_admin@hustlehub.test', password: `Nm_${crypto.randomBytes(9).toString('hex')}!A1` };
 
 function fail(message) {
   console.error(`\n[newman] ${message}`);
@@ -96,7 +98,9 @@ async function main() {
   console.log(`[newman] Starting API on https://localhost:${PORT} ...`);
   const server = spawn(process.execPath, ['server.js'], {
     cwd: ROOT,
-    env: { ...process.env, PORT, NODE_ENV: 'test', MONGODB_DB_NAME: TEST_DB },
+    // The lockout tests make extra failed logins from this one address, so the per-IP login limit is raised a little here (the real default is 10)
+    // and the lockout is set to 2 wrong passwords (the real default is 5). Folder 09 still proves the per-IP limiter trips.
+    env: { ...process.env, PORT, NODE_ENV: 'test', MONGODB_DB_NAME: TEST_DB, LOCKOUT_MAX_ATTEMPTS: '2', RATE_LIMIT_LOGIN_MAX: '16' },
     stdio: ['ignore', 'ignore', 'inherit'],
   });
 
