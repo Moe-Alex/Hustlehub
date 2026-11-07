@@ -49,7 +49,8 @@ function buildQuery(query) {
   return clean.length ? `?${new URLSearchParams(clean)}` : '';
 }
 
-async function request(method, path, { body, query } = {}) {
+// silent401: do not treat a 401 as "the session expired" (used when logging out).
+async function request(method, path, { body, query, silent401 = false } = {}) {
   const token = tokenStore.get();
   let response;
   try {
@@ -71,7 +72,7 @@ async function request(method, path, { body, query } = {}) {
 
   if (!response.ok) {
     // A 401 while holding a token means the session expired or was revoked.
-    if (response.status === 401 && token) onUnauthorized();
+    if (response.status === 401 && token && !silent401) onUnauthorized();
     throw new ApiError(friendlyMessage(response.status, payload), {
       status: response.status,
       fieldErrors: toFieldErrors(payload && payload.errors),
@@ -86,6 +87,8 @@ export const api = {
     register: (data) => request('POST', '/auth/register', { body: data }),
     login: (data) => request('POST', '/auth/login', { body: data }),
     profile: () => request('GET', '/auth/profile'),
+    // Ends the session on the server too, so a copied token stops working.
+    logout: () => request('POST', '/auth/logout', { silent401: true }),
   },
   gigs: {
     list: (query) => request('GET', '/gigs', { query }),
@@ -104,7 +107,7 @@ export const api = {
   },
   transactions: {
     list: (query) => request('GET', '/transactions', { query }),
-    income: () => request('GET', '/transactions/income'),
+    income: (query) => request('GET', '/transactions/income', { query }),
   },
   admin: {
     users: (query) => request('GET', '/admin/users', { query }),

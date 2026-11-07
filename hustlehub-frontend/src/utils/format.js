@@ -7,6 +7,17 @@ export function formatZAR(amount) {
   return rand.format(Number(amount) || 0).replace(/\s/g, ' ');
 }
 
+// Whole rands with no cents, for tax brackets and chart labels (R 245 100).
+export function formatRand(amount) {
+  return `R ${Math.round(Number(amount) || 0).toLocaleString('en-ZA').replace(/\s/g, ' ')}`;
+}
+
+// 0.1809 -> "18.1%", 0.18 -> "18%"
+export function formatPercent(rate, digits = 1) {
+  const value = (Number(rate) || 0) * 100;
+  return `${Number(value.toFixed(digits))}%`;
+}
+
 export function formatDate(value) {
   if (!value) return '';
   const date = new Date(value);
