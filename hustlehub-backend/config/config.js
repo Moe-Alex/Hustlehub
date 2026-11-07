@@ -4,6 +4,7 @@ const path = require('path');
 require('dotenv').config();
 
 // Refuse to start without the secrets the app depends on.
+// eslint-disable-next-line security/detect-object-injection -- key comes from the fixed list on the line above, not from user input
 const missing = ['JWT_SECRET', 'MONGODB_URI'].filter((key) => !process.env[key]);
 if (missing.length > 0) {
   console.error(`[CONFIG ERROR] Missing required environment variable(s): ${missing.join(', ')}. Copy .env.example to .env and set them.`);
@@ -21,11 +22,6 @@ const toInt = (value, fallback) => {
   return Number.isNaN(parsed) ? fallback : parsed;
 };
 
-const toRate = (value, fallback) => {
-  const parsed = parseFloat(value);
-  return Number.isNaN(parsed) || parsed < 0 || parsed > 1 ? fallback : parsed;
-};
-
 const minutes = (n) => n * 60 * 1000;
 
 module.exports = {
@@ -40,9 +36,25 @@ module.exports = {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
-  estimatedTaxRate: toRate(process.env.ESTIMATED_TAX_RATE, 0.15),
   sslKeyPath: path.resolve(process.env.SSL_KEY_PATH || './certs/key.pem'),
   sslCertPath: path.resolve(process.env.SSL_CERT_PATH || './certs/cert.pem'),
+
+  // How many reverse proxies (like nginx in Docker) sit in front of the API. Needed so rate limiting and logs see the
+  // real visitor address instead of the proxy's. Leave at 0 when the API is reached directly.
+  trustProxyHops: toInt(process.env.TRUST_PROXY_HOPS, 0),
+
+  // Account lockout: this many wrong passwords for one email locks logins for that email for this many minutes.
+  lockout: { maxAttempts: toInt(process.env.LOCKOUT_MAX_ATTEMPTS, 5), minutes: toInt(process.env.LOCKOUT_MINUTES, 15) },
+
+  // Logging. Entries always go to the console and logs/events.log; they also go to Grafana Cloud Loki when
+  // LOKI_URL, LOKI_USER and LOKI_TOKEN are set (see README, "Logging and monitoring").
+  logging: {
+    level: process.env.LOG_LEVEL || 'info',
+    toFile: process.env.LOG_TO_FILE !== 'false',
+    json: process.env.LOG_FORMAT === 'json', // one JSON object per line on the console (always on in production)
+    environment: process.env.LOG_ENVIRONMENT || process.env.NODE_ENV || 'development',
+    loki: { url: process.env.LOKI_URL || '', user: process.env.LOKI_USER || '', token: process.env.LOKI_TOKEN || '' },
+  },
 
   // Rate limits (requests allowed per window). Defaults suit production; tune via .env if needed.
   rateLimits: {

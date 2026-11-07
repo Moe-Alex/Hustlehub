@@ -1,28 +1,18 @@
-// Small logging helper for key security events (registrations, logins,failed logins, server errors). Writes to the console and appends tologs/events.log for a persistent audit trail.
+// The logger the rest of the app uses. Settings come from config/config.js (see .env.example).
+// Usage: logger.info('booking.created', { bookingId, amount })
 
-const fs = require('fs');
 const path = require('path');
+const config = require('../config/config');
+const { createLogger } = require('./structuredLogger');
 
-const LOG_DIR = path.join(__dirname, '..', 'logs');
-const LOG_FILE = path.join(LOG_DIR, 'events.log');
+const { logging } = config;
 
-if (!fs.existsSync(LOG_DIR)) {
-  fs.mkdirSync(LOG_DIR, { recursive: true });
-}
-
-function write(level, message) {
-  const line = `[${new Date().toISOString()}] [${level.toUpperCase()}] ${message}\n`;
-
-  console[level === 'error' ? 'error' : 'log'](line.trim());
-
-  // Fire-and-forget - logging must never crash the request lifecycle.
-  fs.appendFile(LOG_FILE, line, (err) => {
-    if (err) console.error('Failed to write to log file:', err.message);
-  });
-}
-
-module.exports = {
-  info: (message) => write('info', message),
-  warn: (message) => write('warn', message),
-  error: (message) => write('error', message),
-};
+module.exports = createLogger({
+  level: logging.level,
+  toFile: logging.toFile,
+  filePath: path.join(__dirname, '..', 'logs', 'events.log'),
+  console: config.nodeEnv !== 'test', // automated test runs stay quiet
+  pretty: !config.isProduction && !logging.json,
+  loki: logging.loki.url ? logging.loki : undefined,
+  labels: { app: 'hustlehub', env: logging.environment },
+});
