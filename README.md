@@ -13,7 +13,7 @@ ST10434391 - Nkosana Mavunhla
 
 **Demonstration video:** PASTE_PART_3_VIDEO_LINK_HERE
 
-**Repository used for the pipeline and static analysis:** PASTE_REPOSITORY_OR_FORK_LINK_HERE (if a fork was used because SonarQube could not connect to the Classroom50 repository, the fork contains every commit of this project)
+**Repository:** https://github.com/EMGPRS/insy7314-2026-insy7314-poe-classroom-sarjooerin (the pipeline runs and the SonarQube analysis are on this repository's `main` branch)
 
 ---
 
@@ -29,7 +29,7 @@ ST10434391 - Nkosana Mavunhla
 | Our own security features (marked **OWN FEATURE**) | [6.2 Our own security features](#62-our-own-security-features-part-3) | `utils/accountLockout.js`, `controllers/authController.js`, `InactivityGuard.jsx` |
 | Security review | [7. Security Review](#7-security-review) | - |
 | Testing evidence | [12. Testing](#12-testing) and [16. Screenshots and Evidence](#16-screenshots-and-evidence) | `hustlehub-backend/tests`, `postman`, `e2e` |
-| References and attribution | [17. Attribution and Use of AI Assistance](#17-attribution-and-use-of-ai-assistance), [18. Reference List](#18-reference-list) | - |
+| Sources and references | [17. Sources and Open-Source Packages](#17-sources-and-open-source-packages), [18. Reference List](#18-reference-list) | - |
 
 ### Team contributions in Part 3
 
@@ -57,7 +57,7 @@ The platform handles credentials, bookings and income data, so security is a des
 | **Freelancer** | Create, edit and delete their own gigs, see booking requests they received, accept or reject them, mark accepted work completed, and see income, estimated tax and take-home pay on a dashboard. |
 | **Admin** | See every user, booking and transaction, and remove any gig for moderation. Admins cannot book gigs or create gigs. |
 
-Admins cannot register through the app. The first admin is created with `npm run seed:admin`.
+Admins cannot register through the app. The first admin is created with `npm run seed:admin` (or `node scripts/seedAdmin.js` inside Docker).
 
 ### How the project grew
 
@@ -465,7 +465,10 @@ Example LogQL queries used for the evidence screenshots:
 sum by (event) (count_over_time({app="hustlehub"} | json [1h]))
 {app="hustlehub", category=~"booking|transaction"}
 {app="hustlehub", level="error"}
+sum by (event) (count_over_time({app="hustlehub"} | json | event!~"http.request|system.*" [1h]))
 ```
+
+The last query is the one in the event-counts screenshot. It leaves out `http.request` and the `system.*` start-up events so that every row fits on the screen.
 
 Evidence screenshots of the dashboard and of these queries are in section 16.
 
@@ -549,6 +552,7 @@ These also go beyond the brief and are marked as our own features:
 
 - **Secret and vulnerability scanning in the pipeline.** Trivy scans the repository for committed secrets, vulnerable dependencies and Dockerfile misconfigurations, and scans both built Docker images, and `npm audit` runs on every package file. Any high or critical finding fails the build. Dependabot opens pull requests for new versions of dependencies, GitHub Actions and Docker base images (`.github/dependabot.yml`).
 - **No secrets in the repository or the images.** `docker-compose.yml` has no secret values: it reads them from `.env` with `${NAME:?message}`, so Compose refuses to start if one is missing. The pipeline creates fresh random secrets for every run. Containers run as an unprivileged user.
+- **Hardened container images.** The API image installs its dependencies, then **removes npm** so the vulnerable packages that npm bundles are not shipped (Trivy reported them against the image), and the application files are owned by root so the running `node` user cannot change them. The web image is built on the current `nginx-unprivileged` release on Alpine, with security upgrades applied. Both images pass the Trivy scan in the pipeline.
 - **Secret-safe logging.** Automatic redaction of secrets and masked email addresses in every log line (section 5.2).
 - **Request tracing.** A request id on every response and log line.
 
@@ -594,7 +598,7 @@ Section 15 lists what is still not covered (for example, a payment gateway, refr
 | Authentication | **JWT bearer tokens** | **Server-side sessions** store a session record for every login and must look it up on every request. That needs a shared session store once there is more than one server, and cookie sessions need extra CSRF protection. JWTs are checked with the secret alone, work the same for the React app and Postman, and scale without shared state. The cost is that a token cannot normally be cancelled before it expires, so we keep it short (1 hour), reload the user on every request (deleted accounts and changed roles take effect straight away) and added a **token version** that a logout raises, which cancels every older token (section 6.2). |
 | Password hashing | **bcrypt, 12 rounds** | **SHA-256 or MD5** are fast, which helps attackers. **argon2id** is also excellent, but needs a native build that often fails on student Windows machines. bcrypt is slow on purpose, salts every password, and its cost can be raised over time. We use `bcryptjs` (pure JavaScript, no native build). |
 | Token storage in the browser | **sessionStorage** | **localStorage** keeps the token after the browser closes. **httpOnly cookies** cannot be read by scripts, but they are sent automatically, which brings CSRF risk, and they behave awkwardly across the two local servers. With sessionStorage the token disappears when the tab closes, the browser never attaches it automatically (so CSRF does not apply), and a strict CSP plus React's escaping reduce the XSS risk. |
-| Database | **MongoDB Atlas with Mongoose** | A relational database would also work. MongoDB is the "M" in MERN, stores gigs naturally as documents, and Mongoose schemas give a second layer of validation. |
+| Database | **MongoDB with Mongoose** (Atlas for local development, a `mongo:7` container in Docker Compose) | A relational database would also work. MongoDB is the "M" in MERN, stores gigs naturally as documents, and Mongoose schemas give a second layer of validation. |
 | Validation | **express-validator** | **Joi or Zod** are good schema libraries, but express-validator is built for Express, and does validation and sanitising in one chain per field. |
 | NoSQL injection | **Remove `$` keys, require strings, Mongoose `sanitizeFilter`** | Relying on only one layer. Three independent layers mean one mistake does not become a breach. |
 | Rate limit storage | **In memory** | **Redis** is needed when several servers share limits. This project runs one API container, so in-memory is simpler and has no extra service to run. Lockout counters, which must survive a restart, are stored in MongoDB instead. |
@@ -611,6 +615,8 @@ Section 15 lists what is still not covered (for example, a payment gateway, refr
 | Web container | **nginx serving a build, as an unprivileged user** | Running the Vite preview server in production is not intended. nginx is small, fast, can be run without root and sets the same security headers. |
 | Browser tests | **Playwright** | It drives a real browser, waits for the page automatically, and runs the same way locally and in the pipeline. |
 | Static analysis | **ESLint with security rules plus SonarQube** | ESLint gives fast feedback on every file in seconds and runs locally. SonarQube adds quality gates, coverage and history. Together they catch more than either alone. |
+| SonarQube hosting | **SonarQube Cloud (hosted)** | Running our own SonarQube server needs a machine that is always on and kept patched. The hosted service needs only a token and works straight from GitHub Actions. |
+| Container images | **`node:22-alpine` with npm removed after install, and the current `nginx-unprivileged`** | A full `node` image or a build that keeps npm ships far more packages than the app needs, and Trivy reported vulnerabilities inside npm itself. Small, current images with fewer packages leave less to attack and keep the image scan clean. |
 
 ---
 
@@ -812,8 +818,8 @@ cp .env.docker.example .env
 # 2. Build the images and start everything, waiting until all three are healthy
 docker compose up --build -d --wait
 
-# 3. Create the admin account
-docker compose run --rm api npm run seed:admin
+# 3. Create the admin account (the API image has no npm, so the script is run with node)
+docker compose run --rm api node scripts/seedAdmin.js
 
 # 4. Open https://localhost:8443  (accept the self-signed certificate warning)
 docker compose ps          # shows all three containers as healthy
@@ -874,7 +880,7 @@ Every layer of the application has automated tests, and all of them run in the p
 
 | Layer | Tool | What it covers | Latest result |
 |---|---|---|---|
-| Backend unit tests | Node's built-in test runner (`node:test`) | Tax engine (12), log redaction (5), Loki sender (7), structured logger (6) | **30 tests, 0 failed**. Together with the Newman API tests below, the backend has about 96% line coverage |
+| Backend unit tests | Node's built-in test runner (`node:test`) | Tax engine (12), log redaction (5), Loki sender (7), structured logger (7), input sanitiser (4) | **35 tests, 0 failed**. Together with the Newman API tests below, the backend has about 96% line coverage |
 | Backend integration tests | Postman collection run by Newman | Every endpoint, roles, ownership, validation, injection, tokens, rate limits, lockout, sessions, headers, CORS | **165 requests, 416 assertions, 0 failed** |
 | Frontend unit and integration tests | Vitest and Testing Library | Pages, forms, routing by role, API client, charts, income page, sessions, inactivity sign-out | **85 tests in 15 files, 0 failed** (about 81% line coverage across all source files) |
 | End-to-end browser tests | Playwright (Chromium) against the Docker stack | Register, log in, create a gig, book, accept, complete, income and tax page, role access, logout revocation, account lockout, admin | **9 tests, 0 failed** |
@@ -927,7 +933,7 @@ npm run lint
 
 ```bash
 docker compose up --build -d --wait
-docker compose run --rm api npm run seed:admin
+docker compose run --rm api node scripts/seedAdmin.js
 cd e2e
 npm install
 npx playwright install chromium
@@ -1005,19 +1011,32 @@ The first run found issues, and each one was reviewed by hand instead of being s
 | **3 errors in the web app** (React Hooks rules) | The inactivity timer called `Date.now()` while rendering, which was moved into an effect, and a data hook that resets its loading flag is documented as the standard fetch-on-change pattern. An unused variable rule was adjusted for JSX component names. |
 | **Dependency advisories (`npm audit`)** | **`body-parser` (high, denial of service via a compressed request body) and `qs` (moderate) in the API's dependencies, and `undici` (high, development-only, used by the test environment) in the web app.** The Express team published the same `body-parser` fix (Express.js 2026). All three were updated with `npm audit fix`, and both applications now report **0 vulnerabilities**. The old request logger package `morgan` was also removed because it was replaced by our structured request logger. |
 
-**Layer 2 - SonarQube.** The `sonarqube` job analyses the API, the web app and the browser tests with the settings in `sonar-project.properties`, uses the backend and frontend coverage reports, and **fails the pipeline if the quality gate fails** (SonarSource n.d.). The result is in section 16:
+**Layer 2 - SonarQube.** We use **SonarQube Cloud** (the hosted service) with its default **"Sonar way"** quality gate. The `sonarqube` job analyses the API, the web app and the browser tests with the settings in `sonar-project.properties`, uses the backend and frontend coverage reports, and **fails the pipeline if the quality gate fails** (SonarSource n.d.). The result is in section 16:
 
-| Measure | Result |
+| Measure | Result on the `main` branch |
 |---|---|
-| Quality gate | PASTE_RESULT_FROM_SONARQUBE (Passed) |
-| Security (vulnerabilities) | PASTE_RESULT_FROM_SONARQUBE |
-| Reliability (bugs) | PASTE_RESULT_FROM_SONARQUBE |
-| Maintainability (code smells) | PASTE_RESULT_FROM_SONARQUBE |
-| Security hotspots reviewed | PASTE_RESULT_FROM_SONARQUBE |
-| Coverage | PASTE_RESULT_FROM_SONARQUBE |
-| Duplications | PASTE_RESULT_FROM_SONARQUBE |
+| Quality gate | **Passed** (all conditions passed) |
+| Security (vulnerabilities) | **0 open issues, rating A** |
+| Reliability (bugs) | **0 open issues, rating A** |
+| Maintainability (code smells) | **0 open issues, rating A** |
+| Security hotspots reviewed | **0** hotspots to review |
+| Coverage | **90.4%** (about 2 500 lines to cover) |
+| Duplications | **0.0%** |
+| Dependency risks | 6 findings, rating C (not part of the quality gate, see section 15) |
 
-**Issues SonarQube reported and how they were fixed:** PASTE_ONE_LINE_PER_ISSUE_FIXED (issue, file, fix). If it reported no security issues, say so here.
+**Issues SonarQube reported and how they were fixed.** On its first runs SonarQube treated the whole project as new code and the quality gate failed. Every finding was fixed in the code, and the analysis was run again until the gate passed:
+
+| Finding | Where | Fix |
+|---|---|---|
+| NoSQL injection through query-string values | `controllers/gigController.js` | Query values are converted with `String()` and `Number()` before they reach MongoDB, the search text is regex-escaped, and the sort option is looked up in a fixed list with `Object.hasOwn`. |
+| Prototype pollution | `middleware/sanitizeMiddleware.js` | The sanitiser builds a clean copy with `Object.fromEntries`, drops unsafe keys, and replaces `req.body` and `req.query` with that copy. |
+| File ownership set with `COPY --chown` | `hustlehub-backend/Dockerfile` | Removed. The application files stay owned by root, and only `certs/` and `logs/` belong to the `node` user. |
+| Log injection | `utils/structuredLogger.js` | Line breaks are removed from the text written to the console, so a user-supplied value cannot forge extra log lines. |
+| Regular expressions that could backtrack badly | `hustlehub-frontend/src/utils/validators.js`, `hustlehub-backend/utils/redact.js` | The email and URL-credential patterns were rewritten so they cannot backtrack. |
+| `parseInt` without a radix | `hustlehub-backend/config/config.js` | Now `Number.parseInt(value, 10)`. |
+| `PATH` lookup when starting `npx` | `hustlehub-backend/scripts/run-newman.js` | Reviewed by hand: this is a development-only test runner that is not part of the deployed app. It is marked `NOSONAR` with the reason written next to it. |
+
+The result is **0 open issues and 0 security hotspots** on `main` (section 16.6).
 
 ---
 
@@ -1048,7 +1067,7 @@ Inside `hustlehub-backend/`:
 - `routes/` - one file per resource
 - `middleware/` - `authMiddleware.js`, `validationMiddleware.js`, `sanitizeMiddleware.js`, `rateLimiters.js`, `securityHeaders.js`, `errorMiddleware.js`, `requestLogger.js`
 - `utils/` - `tax.js`, `accountLockout.js`, `logger.js`, `structuredLogger.js`, `lokiTransport.js`, `redact.js`, `wait.js`, `pagination.js`, `escapeRegex.js`, `money.js`
-- `tests/` - unit tests (`tax`, `redact`, `lokiTransport`, `structuredLogger`)
+- `tests/` - unit tests (`tax`, `redact`, `lokiTransport`, `structuredLogger`, `sanitize`)
 - `scripts/` - `seedAdmin.js`, `run-newman.js`, `migrateBookingStatuses.js`
 - `postman/` - the collection and environment files
 - `eslint.config.js` - static analysis rules
@@ -1078,6 +1097,8 @@ Inside `hustlehub-frontend/`:
 - **Rate limits and lockout counters:** lockout counters are stored in MongoDB and survive restarts, but the per-address rate limits are in memory, which suits one API container. Several containers would need Redis.
 - **Self-signed certificates** are used locally and in Docker, so browsers show a warning. A public deployment would use a trusted certificate, for example from Let's Encrypt.
 - **Money** is stored as rand with 2 decimals. Integer cents would be more robust in production.
+- **SonarQube dependency risks.** SonarQube's Dependency risks view lists 6 findings (rating C) in third-party packages. This view is not part of the quality gate, and the pipeline's own dependency checks (`npm audit` and Trivy, which fail on high and critical findings) pass. Dependabot opens pull requests for package updates.
+- **Pipeline records expire.** In our GitHub organisation, workflow logs and downloadable artifacts are kept for one day only, so the screenshots in section 16 are the permanent record of the pipeline runs.
 - **Deployment:** the project is delivered as containers and is not hosted on a public server, which the brief makes optional.
 
 ---
@@ -1118,13 +1139,15 @@ Every feature in this README has evidence. Screenshots of the application were t
 | *The message shown when the booking rate limit is reached* | *Response headers including the Content Security Policy* |
 | ![Account locked after repeated wrong passwords (OWN FEATURE 1)](docs/screenshots/17-account-lockout.png) | ![Inactivity warning dialog (OWN FEATURE 3)](docs/screenshots/18-inactivity-warning.png) |
 | *OWN FEATURE 1: the account lockout message* | *OWN FEATURE 3: the inactivity warning with its countdown* |
+| ![Login page after being signed out for inactivity](docs/screenshots/18b-inactivity-signed-out.png) | ![The message shown when the per-address login limit is reached](docs/screenshots/login-rate-limit.png) |
+| *OWN FEATURE 3: the login page explains why the person was signed out* | *The per-address login limit (10 failed logins in 15 minutes), a second layer next to the account lockout* |
 
 ### 16.4 Test evidence
 
 | | |
 |---|---|
 | ![Backend unit tests](docs/evidence/unit-tests-terminal.png) | ![Newman results](docs/evidence/newman-terminal.png) |
-| *Backend unit tests: 30 passed, with coverage* | *Newman: 165 requests and 416 assertions, none failed* |
+| *Backend unit tests: 35 passed* | *Newman: 165 requests and 416 assertions, none failed* |
 | ![Vitest results](docs/evidence/vitest-terminal.png) | ![Playwright results](docs/evidence/playwright-results.png) |
 | *Vitest: 85 tests in 15 files passed* | *Playwright browser tests against the Docker stack: 9 passed* |
 
@@ -1136,7 +1159,7 @@ The full Newman HTML report is in [`docs/evidence/newman-report.html`](docs/evid
 
 ![A successful pipeline run with every job green](docs/evidence/pipeline-run-success.png)
 
-*A successful run of the CI workflow: every job and the final pipeline gate are green.*
+*A successful run of the CI workflow: every job and the final pipeline gate are green. GitHub keeps logs and artifacts for one day in our organisation, so this screenshot is the permanent record.*
 
 ![The pipeline failing on a deliberately broken test](docs/evidence/pipeline-failure-demo.png)
 
@@ -1170,14 +1193,16 @@ The full Newman HTML report is in [`docs/evidence/newman-report.html`](docs/evid
 
 | | |
 |---|---|
-| ![Login events in Grafana Explore](docs/evidence/grafana-login-events.png) | ![Booking and transaction events in Grafana Explore](docs/evidence/grafana-booking-transaction-events.png) |
-| *Login successes and failures (`auth.login.*`)* | *Booking and transaction events* |
-| ![Error and security events in Grafana Explore](docs/evidence/grafana-security-errors.png) | ![Event counts by type](docs/evidence/grafana-event-counts.png) |
-| *Security events and errors, including lockouts and rate limits* | *Event counts by type* |
+| ![Login outcomes panel on the Grafana dashboard](docs/evidence/grafana-login-events.png) | ![Bookings and transactions panel on the Grafana dashboard](docs/evidence/grafana-booking-transaction-events.png) |
+| *Login outcomes over time: successes, failures and blocked (locked) logins* | *Bookings and transactions: created, accepted, completed and payments recorded as completed* |
+| ![Security events panel on the Grafana dashboard](docs/evidence/grafana-security-errors.png) | ![Event counts by type in Grafana Explore](docs/evidence/grafana-event-counts.png) |
+| *Security events over time: rate-limit hits and an account lockout* | *Event counts by type in Grafana Explore (`http.request` and `system.*` events left out so every row fits)* |
+
+The dashboard's "Errors" panel is empty and the "Server errors (5xx)" number is 0, because no server errors happened during the demonstration.
 
 ---
 
-## 17. Attribution and Use of AI Assistance
+## 17. Sources and Open-Source Packages
 
 **Our own work.** The design and the code of HustleHub+ are the team's own work, built on the libraries and sources below. The tax engine, logging system, Loki sender, account lockout, revocable sessions, inactivity sign-out, income dashboard, Docker files, pipeline and tests are original to this project.
 
@@ -1195,8 +1220,6 @@ The full Newman HTML report is in [`docs/evidence/newman-report.html`](docs/evid
 | Playwright documentation (Playwright n.d.) | The structure of the browser tests |
 
 **Open-source packages (used under their licences):** Express, Mongoose, jsonwebtoken, bcryptjs, helmet, cors, express-rate-limit, express-validator, dotenv, React, React Router, Vite, Vitest, Testing Library, ESLint, eslint-plugin-security, Newman, Playwright, and the Docker images `node`, `mongo` and `nginxinc/nginx-unprivileged`. Their exact versions are in the `package.json` and lock files, and the Trivy and SonarQube tools are used through their official GitHub Actions.
-
-**Use of AI assistance.** Anthropic's Claude was used as a coding and writing assistant during Part 3, for example to draft code, tests, configuration and parts of this document. The team reviewed, ran and tested the results, made the design decisions, set up the accounts and services, and remains responsible for everything submitted. All behaviour described in this README was checked by running the application and its tests.
 
 ---
 
