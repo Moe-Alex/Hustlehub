@@ -1,31 +1,32 @@
-# HustleHub+ web image: React is built once, then served by nginx over HTTPS with security headers,
-# and /api requests are forwarded to the API container. Build:  docker build -t hustlehub-web ./hustlehub-frontend
+# HustleHub+ API image. Build:  docker build -t hustlehub-api ./hustlehub-backend
+# Runs as the unprivileged "node" user, installs production dependencies only, and checks its own health.
+FROM node:22-alpine
 
-# ---- Stage 1: build the React app ----
-FROM node:22-alpine AS build
+# openssl is only used to create a self-signed certificate on first start (see docker-entrypoint.sh).
+RUN apk add --no-cache openssl
+
+ENV NODE_ENV=production \
+    PORT=5000 \
+    LOG_TO_FILE=false \
+    LOG_FORMAT=json
+
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
 
-# ---- Stage 2: serve it (this image runs nginx as an unprivileged user) ----
-# Current stable nginx on the current Alpine release. The old 1.27 image (Alpine 3.21) had dozens of known OS vulnerabilities.
-FROM nginxinc/nginx-unprivileged:1.30-alpine3.24
+# Dependencies first, so this layer is cached until package files change.
+COPY --chown=node:node package.json package-lock.json ./
+# npm is only needed to install the dependencies. It is removed afterwards so the final image is smaller and does not
+# carry the vulnerable packages that npm bundles inside itself (Trivy reports those against the image).
+RUN npm ci --omit=dev && npm cache clean --force \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
-USER root
-# apk upgrade installs any security fixes released since the base image was built.
-RUN apk upgrade --no-cache && apk add --no-cache openssl
-COPY docker/nginx.conf.template /etc/nginx/templates/default.conf.template
-COPY --chmod=755 docker/20-generate-cert.sh /docker-entrypoint.d/20-generate-cert.sh
-COPY --from=build /app/dist /usr/share/nginx/html
-USER 101
+COPY --chown=node:node . .
+RUN mkdir -p certs logs && chown node:node certs logs && chmod +x docker-entrypoint.sh
 
-# Where /api requests are sent. Compose uses the "api" service; change it with -e API_UPSTREAM=...
-ENV API_UPSTREAM=https://api:5000 \
-    NGINX_ENVSUBST_FILTER=API_ \
-    SSL_DIR=/tmp/certs
+USER node
+EXPOSE 5000
 
-EXPOSE 8443
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \
-  CMD wget --no-check-certificate -q -O /dev/null https://127.0.0.1:8443/ || exit 1
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+  CMD node -e "require('https').get({host:'localhost',port:process.env.PORT,path:'/api/health',rejectUnauthorized:false},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+
+ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["node", "server.js"]

@@ -10,10 +10,12 @@ COPY . .
 RUN npm run build
 
 # ---- Stage 2: serve it (this image runs nginx as an unprivileged user) ----
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+# Current stable nginx on the current Alpine release. The old 1.27 image (Alpine 3.21) had dozens of known OS vulnerabilities.
+FROM nginxinc/nginx-unprivileged:1.30-alpine3.24
 
 USER root
-RUN apk add --no-cache openssl
+# apk upgrade installs any security fixes released since the base image was built.
+RUN apk upgrade --no-cache && apk add --no-cache openssl
 COPY docker/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --chmod=755 docker/20-generate-cert.sh /docker-entrypoint.d/20-generate-cert.sh
 COPY --from=build /app/dist /usr/share/nginx/html
