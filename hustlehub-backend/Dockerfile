@@ -14,7 +14,10 @@ WORKDIR /app
 
 # Dependencies first, so this layer is cached until package files change.
 COPY --chown=node:node package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+# npm is only needed to install the dependencies. It is removed afterwards so the final image is smaller and does not
+# carry the vulnerable packages that npm bundles inside itself (Trivy reports those against the image).
+RUN npm ci --omit=dev && npm cache clean --force \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --chown=node:node . .
 RUN mkdir -p certs logs && chown node:node certs logs && chmod +x docker-entrypoint.sh
