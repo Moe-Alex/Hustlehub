@@ -21,6 +21,14 @@ test('writes one JSON object per event with timestamp, level, event and category
   assert.ok(!Number.isNaN(Date.parse(entry.ts)));
 });
 
+test('line breaks in an event name cannot forge a second log line', () => {
+  const { lines, stdout } = capture();
+  const logger = createLogger({ toFile: false, stdout, pretty: true });
+  logger.info('auth.login\nFAKE info admin.login.success {}');
+  assert.equal(lines.length, 1);
+  assert.ok(!lines[0].includes('\n'), 'the console text must stay on one line');
+});
+
 test('respects the minimum level', () => {
   const { lines, stdout } = capture();
   const logger = createLogger({ level: 'warn', toFile: false, stdout });

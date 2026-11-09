@@ -9,14 +9,16 @@ const config = require('../config/config');
 const lockMs = () => config.lockout.minutes * 60 * 1000;
 
 // Seconds left on an active lock, or 0 when the account is free to try.
-async function secondsLocked(identifier) {
+async function secondsLocked(email) {
+  const identifier = String(email); // plain text only - never a query object
   const record = await LoginAttempt.findOne({ identifier });
   if (!record || !record.lockedUntil) return 0;
   return Math.max(0, Math.ceil((record.lockedUntil.getTime() - Date.now()) / 1000));
 }
 
 // Counts a failed attempt. Returns { locked, retryAfterSeconds } - locked is true on the attempt that trips the lock.
-async function recordFailure(identifier) {
+async function recordFailure(email) {
+  const identifier = String(email); // plain text only - never a query object
   const now = Date.now();
   const windowEnd = new Date(now + lockMs());
   // $inc is atomic, so two simultaneous wrong guesses are both counted.
@@ -35,7 +37,8 @@ async function recordFailure(identifier) {
 }
 
 // A correct login wipes the counter.
-async function clearFailures(identifier) {
+async function clearFailures(email) {
+  const identifier = String(email); // plain text only - never a query object
   await LoginAttempt.deleteOne({ identifier });
 }
 

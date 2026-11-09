@@ -33,10 +33,8 @@ async function listGigs(req, res, next) {
     if (q) {
       // eslint-disable-next-line security/detect-non-literal-regexp -- the search text is escaped by escapeRegex() first, so it cannot add regex syntax
       const pattern = new RegExp(escapeRegex(q), 'i');
-      filter.$or = [
-        { title: mongoose.trusted({ $regex: pattern }) },
-        { description: mongoose.trusted({ $regex: pattern }) },
-      ];
+      // A RegExp object is matched as a regular expression by Mongoose (sanitizeFilter leaves it alone).
+      filter.$or = [{ title: pattern }, { description: pattern }];
     }
 
     const [gigs, total] = await Promise.all([

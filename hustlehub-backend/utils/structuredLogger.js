@@ -54,12 +54,14 @@ function createLogger({
     if (LEVELS[entryLevel] < threshold) return;
 
     const time = new Date();
-    const category = String(event).split('.')[0];
-    const entry = { ts: time.toISOString(), level: entryLevel, event, category, ...redact(fields) };
+    // Line breaks are removed from the event name so it can never forge an extra log line.
+    const safeEvent = String(event).replace(/[\r\n\t]+/g, ' ');
+    const category = safeEvent.split('.')[0];
+    const entry = { ts: time.toISOString(), level: entryLevel, event: safeEvent, category, ...redact(fields) };
     const line = JSON.stringify(entry);
 
     if (consoleOutput) {
-      const text = pretty ? `[${entry.ts}] ${entryLevel.toUpperCase().padEnd(5)} ${event} ${JSON.stringify(redact(fields))}` : line;
+      const text = pretty ? `[${entry.ts}] ${entryLevel.toUpperCase().padEnd(5)} ${safeEvent} ${JSON.stringify(redact(fields))}` : line;
       (entryLevel === 'error' ? stdout.error : stdout.log)(text);
     }
     if (fileReady) {

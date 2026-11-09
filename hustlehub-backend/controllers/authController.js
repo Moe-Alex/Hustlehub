@@ -1,5 +1,6 @@
 // Handles registration, login, logout and the profile. Input is already validated and sanitised before it reaches here.
 
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
@@ -12,9 +13,10 @@ const { formatWaitMinutes } = require('../utils/wait');
 
 const SALT_ROUNDS = 12;
 
-// A real bcrypt hash of a throw-away value. Login compares against it when the email is unknown,
-// so "unknown email" and "wrong password" take the same time and cannot be told apart.
-const DUMMY_HASH = '$2a$12$Og9h8pnqwRF6tbhvgcq0o.p6XBr6vXgTUN2IeVZ/yBEuRvkH5xQ9y';
+// A real bcrypt hash of a random value that is created when the server starts and never stored or reused.
+// Login compares against it when the email is unknown, so "unknown email" and "wrong password" take the same
+// time and cannot be told apart. (Nothing secret is written in the source code.)
+const DUMMY_HASH = bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), SALT_ROUNDS);
 
 function generateToken(user) {
   // Payload stays minimal - never put passwords in a JWT, it's only base64 encoded, not encrypted.
@@ -29,7 +31,10 @@ function generateToken(user) {
 // POST /api/auth/register
 async function registerUser(req, res, next) {
   try {
-    const { username, email, password, role } = req.body;
+    const { username, password, role } = req.body;
+    // The validator already guarantees a string. String() makes sure the value can only ever be plain text in a
+    // database query, never an object such as {"$gt": ""} (NoSQL injection).
+    const email = String(req.body.email);
 
     if (await User.exists({ email })) {
       logger.warn('auth.register.blocked', { requestId: req.id, reason: 'email_in_use', email: maskEmail(email) });
@@ -60,7 +65,8 @@ async function registerUser(req, res, next) {
 // POST /api/auth/login
 async function loginUser(req, res, next) {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = String(req.body.email); // plain text only, see registerUser
 
     // Locked accounts are refused before any password is checked, so a guesser learns nothing more by trying.
     const lockedFor = await secondsLocked(email);

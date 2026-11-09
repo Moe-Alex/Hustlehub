@@ -15,7 +15,9 @@ const stripHtml = new xss.FilterXSS({
   escapeHtml: (text) => text, // tags are removed; React escapes plain text when rendering
 });
 
-const isUnsafeKey = (key) => key.startsWith('$') || key.includes('.');
+// "__proto__", "constructor" and "prototype" are removed too: they can change how an object behaves (prototype pollution).
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const isUnsafeKey = (key) => FORBIDDEN_KEYS.has(key) || key.startsWith('$') || key.includes('.');
 
 function sanitizeValue(value) {
   if (typeof value === 'string') return stripHtml.process(value);
@@ -30,11 +32,9 @@ function sanitizeValue(value) {
 function sanitizeObject(target) {
   Object.keys(target).forEach((key) => {
     if (isUnsafeKey(key)) {
-      // eslint-disable-next-line security/detect-object-injection -- unsafe keys (__proto__, constructor, $ and . names) are removed first; this only touches keys of the same object
-      delete target[key];
+      Reflect.deleteProperty(target, key);
     } else if (!SKIP_FIELDS.has(key)) {
-      // eslint-disable-next-line security/detect-object-injection -- unsafe keys (__proto__, constructor, $ and . names) are removed first; this only touches keys of the same object
-      target[key] = sanitizeValue(target[key]);
+      Reflect.set(target, key, sanitizeValue(Reflect.get(target, key)));
     }
   });
 }

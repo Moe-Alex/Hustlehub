@@ -51,5 +51,5 @@ async function startServer() {
 
 startServer().catch((err) => {
   logger.error('system.startup.failed', { errorName: err.name, message: err.message });
-  logger.close().finally(() => process.exit(1));
+  void logger.close().finally(() => process.exit(1)); // void: nothing waits for this, the process exits when it settles
 });

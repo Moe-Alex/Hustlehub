@@ -16,6 +16,8 @@ const { requestLogger } = require('./middleware/requestLogger');
 
 const app = express();
 
+app.disable('x-powered-by'); // do not tell visitors which framework is running
+
 app.set('trust proxy', config.trustProxyHops); // see TRUST_PROXY_HOPS in .env.example
 
 app.use(requestLogger); // request id + one structured log line per request
