@@ -1,0 +1,13 @@
+{
+  "name": "hustlehub-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HustleHub+ end-to-end browser tests (Playwright). They drive the real site, so the whole stack must be running.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
