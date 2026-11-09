@@ -1022,7 +1022,7 @@ The first run found issues, and each one was reviewed by hand instead of being s
 | Security hotspots reviewed | **0** hotspots to review |
 | Coverage | **90.4%** (about 2 500 lines to cover) |
 | Duplications | **0.0%** |
-| Dependency risks | 6 findings, rating C (not part of the quality gate, see section 15) |
+| Dependency risks | 6 findings, rating C (outside the quality gate; each one is explained in section 15) |
 
 **Issues SonarQube reported and how they were fixed.** On its first runs SonarQube treated the whole project as new code and the quality gate failed. Every finding was fixed in the code, and the analysis was run again until the gate passed:
 
@@ -1097,7 +1097,7 @@ Inside `hustlehub-frontend/`:
 - **Rate limits and lockout counters:** lockout counters are stored in MongoDB and survive restarts, but the per-address rate limits are in memory, which suits one API container. Several containers would need Redis.
 - **Self-signed certificates** are used locally and in Docker, so browsers show a warning. A public deployment would use a trusted certificate, for example from Let's Encrypt.
 - **Money** is stored as rand with 2 decimals. Integer cents would be more robust in production.
-- **SonarQube dependency risks.** SonarQube's Dependency risks view lists 6 findings (rating C) in third-party packages. This view is not part of the quality gate, and the pipeline's own dependency checks (`npm audit` and Trivy, which fail on high and critical findings) pass. Dependabot opens pull requests for package updates.
+- **SonarQube dependency risks.** SonarQube's Dependency risks view lists 6 findings among 402 dependencies (rating C). We reviewed each one. **Five are in development-only transitive packages** (`picomatch` 4.0.7, `minimatch` 3.1.5 and `uri-js` 4.4.1, three times). They belong to the linting and test tools, are not installed in the Docker images (`npm ci --omit=dev`), and are already on the newest release available, so no fixed version exists yet. **One is a medium-severity prototype-pollution advisory in `sift` 17.1.3**, a runtime dependency of Mongoose. The newest Mongoose release uses `sift` 17.1.4, so upgrading Mongoose is the planned fix, and our request sanitiser already drops `__proto__`, `constructor` and `prototype` keys from every request body and query string, which limits how attacker-controlled data could reach it. This view is not part of the "Sonar way" quality gate, and the pipeline's `npm audit` and Trivy checks, which fail on any high or critical finding, both pass.
 - **Pipeline records expire.** In our GitHub organisation, workflow logs and downloadable artifacts are kept for one day only, so the screenshots in section 16 are the permanent record of the pipeline runs.
 - **Deployment:** the project is delivered as containers and is not hosted on a public server, which the brief makes optional.
 
