@@ -2,7 +2,7 @@
 # and /api requests are forwarded to the API container. Build:  docker build -t hustlehub-web ./hustlehub-frontend
 
 # ---- Stage 1: build the React app ----
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
