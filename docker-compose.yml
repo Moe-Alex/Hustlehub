@@ -1,0 +1,71 @@
+# HustleHub+ - the whole stack in three containers: MongoDB, the API and the web front end.
+#
+#   1. cp .env.docker.example .env      (then fill in the secrets - never commit .env)
+#   2. docker compose up --build -d
+#   3. open https://localhost:8443      (accept the self-signed certificate warning)
+#
+# No secret is written in this file: every password and key is read from your .env file or, in CI, from GitHub secrets.
+# The "${NAME:?message}" form makes Compose stop with a clear message if a required value is missing.
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-hustlehub}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in your .env file}
+    volumes:
+      - mongo-data:/data/db
+    # Not published to the host: only the API container can reach the database.
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  api:
+    build: ./hustlehub-backend
+    image: hustlehub-api:local
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+      MONGODB_URI: ${MONGODB_URI:-mongodb://${MONGO_ROOT_USERNAME:-hustlehub}:${MONGO_ROOT_PASSWORD}@mongo:27017/hustlehub?authSource=admin}
+      MONGODB_DB_NAME: hustlehub
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET (at least 32 characters) in your .env file}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      CLIENT_ORIGIN: https://localhost:${WEB_PORT:-8443}
+      TRUST_PROXY_HOPS: "1"
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-hustlehub_admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      LOCKOUT_MAX_ATTEMPTS: ${LOCKOUT_MAX_ATTEMPTS:-5}
+      LOCKOUT_MINUTES: ${LOCKOUT_MINUTES:-15}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_ENVIRONMENT: ${LOG_ENVIRONMENT:-docker}
+      # Cloud logging (Grafana Cloud Loki). Leave empty to log to the container output only.
+      LOKI_URL: ${LOKI_URL:-}
+      LOKI_USER: ${LOKI_USER:-}
+      LOKI_TOKEN: ${LOKI_TOKEN:-}
+    # Published on this computer only, so tools such as Newman and Postman can test the API directly.
+    ports:
+      - "127.0.0.1:${API_PORT:-5000}:5000"
+
+  web:
+    build: ./hustlehub-frontend
+    image: hustlehub-web:local
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_UPSTREAM: https://api:5000
+    ports:
+      - "${WEB_PORT:-8443}:8443"
+
+volumes:
+  mongo-data:
