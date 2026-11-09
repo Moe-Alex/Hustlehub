@@ -19,29 +19,24 @@ const stripHtml = new xss.FilterXSS({
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const isUnsafeKey = (key) => FORBIDDEN_KEYS.has(key) || key.startsWith('$') || key.includes('.');
 
+// Builds a clean copy instead of editing the request object in place: unsafe keys are left out and strings are stripped.
 function sanitizeValue(value) {
   if (typeof value === 'string') return stripHtml.process(value);
   if (Array.isArray(value)) return value.map(sanitizeValue);
-  if (value && typeof value === 'object') {
-    sanitizeObject(value);
-    return value;
-  }
+  if (value && typeof value === 'object') return sanitizeObject(value);
   return value;
 }
 
-function sanitizeObject(target) {
-  Object.keys(target).forEach((key) => {
-    if (isUnsafeKey(key)) {
-      Reflect.deleteProperty(target, key);
-    } else if (!SKIP_FIELDS.has(key)) {
-      Reflect.set(target, key, sanitizeValue(Reflect.get(target, key)));
-    }
-  });
+function sanitizeObject(source) {
+  const entries = Object.entries(source)
+    .filter(([key]) => !isUnsafeKey(key))
+    .map(([key, value]) => [key, SKIP_FIELDS.has(key) ? value : sanitizeValue(value)]);
+  return Object.fromEntries(entries);
 }
 
 function sanitizeRequest(req, res, next) {
-  if (req.body && typeof req.body === 'object') sanitizeObject(req.body);
-  if (req.query && typeof req.query === 'object') sanitizeObject(req.query);
+  if (req.body && typeof req.body === 'object') req.body = sanitizeValue(req.body);
+  if (req.query && typeof req.query === 'object') req.query = sanitizeValue(req.query);
   next();
 }
 

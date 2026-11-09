@@ -61,7 +61,8 @@ function createLogger({
     const line = JSON.stringify(entry);
 
     if (consoleOutput) {
-      const text = pretty ? `[${entry.ts}] ${entryLevel.toUpperCase().padEnd(5)} ${safeEvent} ${JSON.stringify(redact(fields))}` : line;
+      // JSON.stringify already escapes line breaks; the replace makes sure a console line can never be split in two.
+      const text = (pretty ? `[${entry.ts}] ${entryLevel.toUpperCase().padEnd(5)} ${safeEvent} ${JSON.stringify(redact(fields))}` : line).replace(/[\r\n]+/g, ' ');
       (entryLevel === 'error' ? stdout.error : stdout.log)(text);
     }
     if (fileReady) {

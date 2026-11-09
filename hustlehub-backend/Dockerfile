@@ -13,21 +13,22 @@ ENV NODE_ENV=production \
 WORKDIR /app
 
 # Dependencies first, so this layer is cached until package files change.
-COPY --chown=node:node package.json package-lock.json ./
+COPY package.json package-lock.json ./
 # npm is only needed to install the dependencies. It is removed afterwards so the final image is smaller and does not
 # carry the vulnerable packages that npm bundles inside itself (Trivy reports those against the image).
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 # Only the application code is copied (not everything in the folder), so nothing else can end up in the image.
-COPY --chown=node:node app.js server.js docker-entrypoint.sh ./
-COPY --chown=node:node config ./config
-COPY --chown=node:node controllers ./controllers
-COPY --chown=node:node middleware ./middleware
-COPY --chown=node:node models ./models
-COPY --chown=node:node routes ./routes
-COPY --chown=node:node utils ./utils
-COPY --chown=node:node scripts ./scripts
+# It stays owned by root: the "node" user can read and run it but cannot change it. Only certs/ and logs/ are writable.
+COPY app.js server.js docker-entrypoint.sh ./
+COPY config ./config
+COPY controllers ./controllers
+COPY middleware ./middleware
+COPY models ./models
+COPY routes ./routes
+COPY utils ./utils
+COPY scripts ./scripts
 RUN mkdir -p certs logs && chown node:node certs logs && chmod +x docker-entrypoint.sh
 
 USER node

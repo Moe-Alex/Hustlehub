@@ -23,23 +23,28 @@ async function listGigs(req, res, next) {
     const { q, category, minPrice, maxPrice, sort = 'newest' } = req.query;
 
     const filter = { isActive: true };
-    if (category) filter.category = category;
+    // Values are converted to plain strings / numbers, so an object such as ?category[$ne]=x can never reach the query.
+    if (category) filter.category = String(category);
 
     const price = {};
-    if (minPrice !== undefined) price.$gte = minPrice;
-    if (maxPrice !== undefined) price.$lte = maxPrice;
+    if (minPrice !== undefined) price.$gte = Number(minPrice);
+    if (maxPrice !== undefined) price.$lte = Number(maxPrice);
     if (Object.keys(price).length > 0) filter.price = mongoose.trusted(price);
 
     if (q) {
       // eslint-disable-next-line security/detect-non-literal-regexp -- the search text is escaped by escapeRegex() first, so it cannot add regex syntax
-      const pattern = new RegExp(escapeRegex(q), 'i');
+      const pattern = new RegExp(escapeRegex(String(q)), 'i');
       // A RegExp object is matched as a regular expression by Mongoose (sanitizeFilter leaves it alone).
       filter.$or = [{ title: pattern }, { description: pattern }];
     }
 
+    // Only the three known sort names are accepted; anything else falls back to "newest".
+    const sortKey = String(sort);
+    // eslint-disable-next-line security/detect-object-injection -- sortKey is checked with hasOwn first
+    const sortOrder = Object.hasOwn(SORT_OPTIONS, sortKey) ? SORT_OPTIONS[sortKey] : SORT_OPTIONS.newest;
+
     const [gigs, total] = await Promise.all([
-      // eslint-disable-next-line security/detect-object-injection -- sort is checked against a fixed list by the validator (isIn)
-      Gig.find(filter).sort(SORT_OPTIONS[sort]).skip(pagination.skip).limit(pagination.limit).populate('freelancer', 'username'),
+      Gig.find(filter).sort(sortOrder).skip(pagination.skip).limit(pagination.limit).populate('freelancer', 'username'),
       Gig.countDocuments(filter),
     ]);
 
