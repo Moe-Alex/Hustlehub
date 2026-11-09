@@ -26,4 +26,4 @@ ENV API_UPSTREAM=https://api:5000 \
 
 EXPOSE 8443
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \
-  CMD wget --no-check-certificate -q -O /dev/null https://localhost:8443/ || exit 1
+  CMD wget --no-check-certificate -q -O /dev/null https://127.0.0.1:8443/ || exit 1
