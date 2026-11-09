@@ -221,7 +221,7 @@ jobs:
         run: docker compose ps
 
       - name: Create the admin account
-        run: docker compose run --rm api npm run seed:admin
+        run: docker compose run --rm api node scripts/seedAdmin.js
 
       - name: Install the browser tests
         run: npm ci
