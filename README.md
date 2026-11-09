@@ -11,7 +11,7 @@ ST10453511 - Moegammad Alexander
 
 ST10434391 - Nkosana Mavunhla
 
-**Demonstration video:** PASTE_PART_3_VIDEO_LINK_HERE
+**Demonstration video:** https://youtu.be/mwo2372D1L0
 
 **Repository:** https://github.com/EMGPRS/insy7314-2026-insy7314-poe-classroom-sarjooerin (the pipeline runs and the SonarQube analysis are on this repository's `main` branch)
 
@@ -321,9 +321,9 @@ sequenceDiagram
 
 ### 4.1 How South African income tax is calculated
 
-South Africa taxes individuals with a **progressive** system: income is cut into slices ("brackets"), and each slice is taxed at its own rate. Only the part of the income that falls inside a bracket is taxed at that bracket's rate, so earning more never reduces take-home pay. After the tax on the slices is added up, a **rebate** is subtracted. The rebate depends on age, and everyone gets the primary rebate (SARS n.d.). The tax year runs from **1 March to the end of February**, and SARS calls the year that ends in February 2027 the "2027 tax year" (SARS n.d.). The app labels it **2026/27**.
+South Africa taxes individuals with a **progressive** system: income is cut into slices ("brackets"), and each slice is taxed at its own rate. Only the part of the income that falls inside a bracket is taxed at that bracket's rate, so earning more never reduces take-home pay. After the tax on the slices is added up, a **rebate** is subtracted. The rebate depends on age, and everyone gets the primary rebate (South African Revenue Service, n.d.). The tax year runs from **1 March to the end of February**, and SARS calls the year that ends in February 2027 the "2027 tax year" (South African Revenue Service, n.d.). The app labels it **2026/27**.
 
-Rates for the 2026/27 tax year (1 March 2026 to 28 February 2027), as published by SARS (n.d.):
+Rates for the 2026/27 tax year (1 March 2026 to 28 February 2027), as published by the South African Revenue Service (n.d.):
 
 | Taxable income (R) | Tax rate on this slice |
 |---|---|
@@ -364,7 +364,7 @@ Everything is calculated on the **server** (`hustlehub-backend/utils/tax.js` and
 | Primary rebate | | | - R17 820 |
 | **Estimated tax** | | | **R98 417** |
 
-A person under 65 pays no tax at all below **R99 000** (R17 820 divided by 18%), which matches the threshold published by SARS (n.d.). The unit tests check this example, the thresholds, the age rebates and the tax-year boundaries.
+A person under 65 pays no tax at all below **R99 000** (R17 820 divided by 18%), which matches the threshold published by the South African Revenue Service (n.d.). The unit tests check this example, the thresholds, the age rebates and the tax-year boundaries.
 
 **Assumptions, stated on the dashboard itself:** the figure is an estimate for illustration, not tax advice. It assumes gig income is the only income and does not include medical credits, retirement contributions or other deductions. Freelancers who earn outside a salary are normally provisional taxpayers who pay in two instalments a year, which the dashboard also reminds them.
 
@@ -391,7 +391,7 @@ The charts are drawn with plain SVG (no charting library, so no extra dependency
 
 ### 5.1 What is logged, and why
 
-Logging has two jobs here. It gives an **audit trail** (who did what, and when) and it gives **early warning** of attacks and faults (a burst of failed logins, a spike of server errors). Following the OWASP Logging Cheat Sheet (OWASP Foundation n.d.), we log authentication successes and failures, access-control failures and server errors, and we keep passwords and tokens out of the logs.
+Logging has two jobs here. It gives an **audit trail** (who did what, and when) and it gives **early warning** of attacks and faults (a burst of failed logins, a spike of server errors). Following the OWASP Logging Cheat Sheet (OWASP Foundation, n.d.), we log authentication successes and failures, access-control failures and server errors, and we keep passwords and tokens out of the logs.
 
 Each log line is one JSON object with a timestamp, level, event name, category and the details of that event. Event names are `category.action`, so they can be searched and charted.
 
@@ -426,7 +426,7 @@ flowchart LR
 
 1. **Console** - readable text in development, JSON in production and in Docker (`docker compose logs api`).
 2. **`logs/events.log`** - a local JSON-lines audit file (switched off in Docker with `LOG_TO_FILE=false`, because container output is already collected).
-3. **Grafana Cloud Loki** - the cloud logging platform. It is enabled only when `LOKI_URL`, `LOKI_USER` and `LOKI_TOKEN` are set. Lines are sent with Loki's push API (Grafana Labs n.d.), which takes JSON with a `streams` array of labels and `[nanosecond timestamp, line]` pairs.
+3. **Grafana Cloud Loki** - the cloud logging platform. It is enabled only when `LOKI_URL`, `LOKI_USER` and `LOKI_TOKEN` are set. Lines are sent with Loki's push API (Grafana Labs, n.d.), which takes JSON with a `streams` array of labels and `[nanosecond timestamp, line]` pairs.
 
 The Loki sender (`utils/lokiTransport.js`) is written so that **logging can never break or slow the app**: lines are queued and sent in batches of 100 or every 2 seconds, a network failure or a `429`/`5xx` answer is retried up to three times, a rejected request (wrong credentials, `4xx`) is dropped with one warning a minute, the queue is capped at 2 000 lines (oldest dropped first), the timer never keeps the process alive, and on shutdown the remaining lines are flushed. Credentials are only sent over HTTPS (plain HTTP is accepted only for `localhost` testing). The access token comes from the environment and is never written in the code. Seven unit tests run the sender against a fake Loki server, including the retry, drop and queue-limit behaviour, and the whole flow was also run against a real Loki container.
 
@@ -488,7 +488,7 @@ Evidence screenshots of the dashboard and of these queries are in section 16.
 | Validation | express-validator on every body, query and id. Every text field must be a real string. | `middleware/validationMiddleware.js` |
 | Sanitisation | NoSQL operators and HTML removed from body and query. Search text is regex-escaped. Mongoose `sanitizeFilter` is on. | `middleware/sanitizeMiddleware.js`, `utils/escapeRegex.js`, `config/db.js` |
 | Rate limiting | General, login (failed only), register, booking, gig writes. Clear 429 message with how long to wait. | `middleware/rateLimiters.js` |
-| Security headers | Helmet, a Content Security Policy that blocks everything, no framing, no referrer, no caching of API responses (see Express.js n.d. for the recommendation). | `middleware/securityHeaders.js` |
+| Security headers | Helmet, a Content Security Policy that blocks everything, no framing, no referrer, no caching of API responses (see the recommendation in Express.js (n.d.)). | `middleware/securityHeaders.js` |
 | CORS | Only the frontend origins in `CLIENT_ORIGIN` may call the API from a browser. | `middleware/securityHeaders.js` |
 | HTTPS | The API serves HTTPS itself, the Vite server uses the same certificate, and in Docker nginx serves the site over TLS 1.2 and 1.3. | `server.js`, `vite.config.js`, `hustlehub-frontend/docker/nginx.conf.template` |
 | Safe errors | One central handler. Stack traces, file paths and database messages stay in the server log. | `middleware/errorMiddleware.js` |
@@ -560,7 +560,7 @@ These also go beyond the brief and are marked as our own features:
 
 ## 7. Security Review
 
-This review was done on the final code. It follows the OWASP Top 10:2021 categories (OWASP Foundation 2021) and the four areas named in the brief: injection, cross-site scripting, authentication weaknesses and access control. Each row names the threat, how the code defends against it, and the test that proves it.
+This review was done on the final code. It follows the OWASP Top 10:2021 categories (OWASP Foundation, 2021) and the four areas named in the brief: injection, cross-site scripting, authentication weaknesses and access control. Each row names the threat, how the code defends against it, and the test that proves it.
 
 ### 7.1 Threats, controls and evidence
 
@@ -795,7 +795,7 @@ Open **https://localhost:5173**. The browser warns about the self-signed certifi
 
 ### 11.3 Run everything with Docker
 
-Three containers are started (Docker Compose, Docker Inc. n.d.): **mongo** (the database, not reachable from outside Docker), **api** (the Express API over HTTPS) and **web** (nginx serving the built React app over HTTPS and forwarding `/api` to the API).
+Three containers are started with Docker Compose (Docker Inc., n.d.): **mongo** (the database, not reachable from outside Docker), **api** (the Express API over HTTPS) and **web** (nginx serving the built React app over HTTPS and forwarding `/api` to the API).
 
 ```mermaid
 flowchart LR
@@ -940,7 +940,7 @@ npx playwright install chromium
 E2E_ADMIN_EMAIL=admin@example.com E2E_ADMIN_PASSWORD=<your admin password> npx playwright test
 ```
 
-The tests (`e2e/tests/hustlehub.spec.js`, written with Playwright; Playwright n.d.) follow the journeys from the brief in a real browser and generate random passwords on every run, so no password is written in the code. The login limiter is in memory, so restart the API container (`docker compose restart api`) before running them a second time within 15 minutes.
+The tests (`e2e/tests/hustlehub.spec.js`) are written with Playwright (Playwright, n.d.) and follow the journeys from the brief in a real browser and generate random passwords on every run, so no password is written in the code. The login limiter is in memory, so restart the API container (`docker compose restart api`) before running them a second time within 15 minutes.
 
 ---
 
@@ -948,7 +948,7 @@ The tests (`e2e/tests/hustlehub.spec.js`, written with Playwright; Playwright n.
 
 ### 13.1 Overview
 
-The pipeline is one GitHub Actions workflow, `.github/workflows/ci.yml` (GitHub n.d.). It starts **automatically** on every push and pull request (and can be started by hand), every run can be inspected in the **Actions** tab, and test reports and coverage are attached to each run as downloadable artifacts.
+The pipeline is one GitHub Actions workflow, `.github/workflows/ci.yml` (GitHub, n.d.). It starts **automatically** on every push and pull request (and can be started by hand), every run can be inspected in the **Actions** tab, and test reports and coverage are attached to each run as downloadable artifacts.
 
 ```mermaid
 flowchart LR
@@ -974,9 +974,9 @@ flowchart LR
 | **backend** | Installs dependencies with `npm ci`, starts a MongoDB service container, creates a throw-away JWT secret and certificate, runs ESLint, then the unit tests and the Newman API tests together with a coverage report that also measures the API server while Newman calls it, and uploads the coverage and the Newman HTML report | A lint error or warning, a failing unit test, a failing Newman assertion |
 | **frontend** | `npm ci`, ESLint, Vitest with coverage, then the production build, and uploads the coverage and the built site | A lint error, a failing test, a failed build |
 | **dependency-audit** | `npm audit --audit-level=high` for the backend, frontend and end-to-end packages | A high or critical known vulnerability |
-| **trivy-scan** | Trivy scans the repository for vulnerable dependencies, committed secrets and Dockerfile misconfigurations (Aqua Security 2026) | A high or critical finding |
+| **trivy-scan** | Trivy scans the repository for vulnerable dependencies, committed secrets and Dockerfile misconfigurations (Aqua Security, 2026) | A high or critical finding |
 | **docker-e2e** | Creates a `.env` of random secrets for this run, builds both images, starts the **whole stack with Docker Compose**, waits until all containers are healthy, creates the admin, runs the **Playwright browser tests** against the containers, then scans both built images with Trivy | An image that does not build, a container that is not healthy, a failing browser test, a vulnerable image |
-| **sonarqube** | Runs SonarQube static analysis on the code and the coverage from the first two jobs and waits for the **quality gate** (SonarSource n.d.) | Missing Sonar settings, or a failed quality gate |
+| **sonarqube** | Runs SonarQube static analysis on the code and the coverage from the first two jobs and waits for the **quality gate** (SonarSource, n.d.) | Missing Sonar settings, or a failed quality gate |
 | **pipeline-gate** | The single overall result. It runs even if other jobs failed and fails unless **every** job succeeded | Any other job did not succeed |
 
 **Why it can be trusted to fail.** No step uses `continue-on-error`, so a failing step fails its job, and the final gate job fails if any job did not succeed, including a job that was skipped or cancelled. The SonarQube job stops with an error message, instead of silently skipping, when its settings are missing. A pipeline run with a deliberately broken test is shown in section 16 to prove the red result.
@@ -1009,9 +1009,9 @@ The first run found issues, and each one was reviewed by hand instead of being s
 | **25 warnings in the API** (23 in the code and 2 in test files: object injection sinks, non-literal file paths, a non-literal regular expression) | Reviewed one by one. **The log redaction function copied user-supplied keys into a new object with `obj[key] = ...`, which is unsafe for a key such as `__proto__`. It was rewritten with `Object.fromEntries`**, which cannot change an object's prototype. The remaining ones are false positives where the key or path comes from a fixed list, the server's own configuration, or a value that was validated first (for example the sort option is checked against a fixed list, and the search text is escaped by `escapeRegex`). Each one has an `eslint-disable-next-line` comment **with the reason written next to it**, so a reviewer can check it. |
 | **9 warnings in the web app** | Two real hardening fixes: `StatusBadge` and `homeFor` now use `Object.hasOwn`, so a value such as `constructor` cannot pick up a built-in property. The others are fixed-name lookups, each documented in the same way. |
 | **3 errors in the web app** (React Hooks rules) | The inactivity timer called `Date.now()` while rendering, which was moved into an effect, and a data hook that resets its loading flag is documented as the standard fetch-on-change pattern. An unused variable rule was adjusted for JSX component names. |
-| **Dependency advisories (`npm audit`)** | **`body-parser` (high, denial of service via a compressed request body) and `qs` (moderate) in the API's dependencies, and `undici` (high, development-only, used by the test environment) in the web app.** The Express team published the same `body-parser` fix (Express.js 2026). All three were updated with `npm audit fix`, and both applications now report **0 vulnerabilities**. The old request logger package `morgan` was also removed because it was replaced by our structured request logger. |
+| **Dependency advisories (`npm audit`)** | **`body-parser` (high, denial of service via a compressed request body) and `qs` (moderate) in the API's dependencies, and `undici` (high, development-only, used by the test environment) in the web app.** The Express team published the same `body-parser` fix (Express.js, 2026). All three were updated with `npm audit fix`, and both applications now report **0 vulnerabilities**. The old request logger package `morgan` was also removed because it was replaced by our structured request logger. |
 
-**Layer 2 - SonarQube.** We use **SonarQube Cloud** (the hosted service) with its default **"Sonar way"** quality gate. The `sonarqube` job analyses the API, the web app and the browser tests with the settings in `sonar-project.properties`, uses the backend and frontend coverage reports, and **fails the pipeline if the quality gate fails** (SonarSource n.d.). The result is in section 16:
+**Layer 2 - SonarQube.** We use **SonarQube Cloud** (the hosted service) with its default **"Sonar way"** quality gate. The `sonarqube` job analyses the API, the web app and the browser tests with the settings in `sonar-project.properties`, uses the backend and frontend coverage reports, and **fails the pipeline if the quality gate fails** (SonarSource, n.d.). The result is in section 16:
 
 | Measure | Result on the `main` branch |
 |---|---|
@@ -1210,14 +1210,16 @@ The dashboard's "Errors" panel is empty and the "Server errors (5xx)" number is 
 
 | Source | Used for |
 |---|---|
-| South African Revenue Service tax tables (SARS n.d.) | The brackets, rebates and thresholds in `config/taxTables.js` (the source is also written in that file) |
-| Loki HTTP API documentation (Grafana Labs n.d.) | The JSON payload format and endpoint used by `utils/lokiTransport.js` |
-| OWASP Logging Cheat Sheet (OWASP Foundation n.d.) | Which events to log and which data to keep out of logs |
-| OWASP Top 10:2021 (OWASP Foundation 2021) | The structure of the security review |
-| Express security best practices (Express.js n.d.) | Login throttling, Helmet and dependency checks |
-| SonarQube and GitHub Actions documentation (SonarSource n.d.; GitHub n.d.) | The shape of the pipeline and the SonarQube job |
-| Docker Compose documentation (Docker Inc. n.d.) | The structure of `docker-compose.yml` |
-| Playwright documentation (Playwright n.d.) | The structure of the browser tests |
+| South African Revenue Service (n.d.), Rates of tax for individuals | The brackets, rebates and thresholds in `config/taxTables.js` (the source is also written in that file) |
+| Grafana Labs (n.d.), Loki HTTP API | The JSON payload format and endpoint used by `utils/lokiTransport.js` |
+| OWASP Foundation (n.d.), Logging Cheat Sheet | Which events to log and which data to keep out of logs |
+| OWASP Foundation (2021), OWASP Top 10:2021 | The structure of the security review |
+| Express.js (n.d.), Production best practices: security | Login throttling, Helmet and dependency checks |
+| Express.js (2026), October 2026 security releases | The `body-parser` fix applied in the API |
+| SonarSource (n.d.), Adding analysis to GitHub Actions workflow; GitHub (n.d.), Understanding GitHub Actions | The shape of the pipeline and the SonarQube job |
+| Aqua Security (2026), trivy-action v0.36.0 release | The Trivy scan steps in the pipeline |
+| Docker Inc. (n.d.), Docker Compose | The structure of `docker-compose.yml` |
+| Playwright (n.d.), Installation | The structure of the browser tests |
 
 **Open-source packages (used under their licences):** Express, Mongoose, jsonwebtoken, bcryptjs, helmet, cors, express-rate-limit, express-validator, dotenv, React, React Router, Vite, Vitest, Testing Library, ESLint, eslint-plugin-security, Newman, Playwright, and the Docker images `node`, `mongo` and `nginxinc/nginx-unprivileged`. Their exact versions are in the `package.json` and lock files, and the Trivy and SonarQube tools are used through their official GitHub Actions.
 
@@ -1225,24 +1227,24 @@ The dashboard's "Errors" panel is empty and the "Server errors (5xx)" number is 
 
 ## 18. Reference List
 
-Aqua Security (2026) *trivy-action v0.36.0 release*. Available at: https://github.com/aquasecurity/trivy-action/releases/tag/v0.36.0 (Accessed 7 November 2026).
+Aqua Security, 2026. trivy-action v0.36.0 release. [online] Available at: <https://github.com/aquasecurity/trivy-action/releases/tag/v0.36.0> [Accessed 1 November 2026].
 
-Docker Inc. (n.d.) *Docker Compose*. Available at: https://docs.docker.com/compose/ (Accessed 7 November 2026).
+Docker Inc., n.d. Docker Compose. [online] Available at: <https://docs.docker.com/compose/> [Accessed 1 November 2026].
 
-Express.js (n.d.) *Production best practices: security*. Available at: https://expressjs.com/en/advanced/best-practice-security/ (Accessed 7 November 2026).
+Express.js, n.d. Production best practices: security. [online] Available at: <https://expressjs.com/en/advanced/best-practice-security/> [Accessed 1 November 2026].
 
-Express.js (2026) *October 2026 security releases*. Available at: https://expressjs.com/en/blog/2026-10-31-security-releases/ (Accessed 7 November 2026).
+Express.js, 2026. October 2026 security releases. [online] Available at: <https://expressjs.com/en/blog/2026-10-31-security-releases/> [Accessed 4 November 2026].
 
-GitHub (n.d.) *Understanding GitHub Actions*. Available at: https://docs.github.com/en/actions/get-started/understand-github-actions (Accessed 7 November 2026).
+GitHub, n.d. Understanding GitHub Actions. [online] Available at: <https://docs.github.com/en/actions/get-started/understand-github-actions> [Accessed 4 November 2026].
 
-Grafana Labs (n.d.) *Loki HTTP API*. Available at: https://grafana.com/docs/loki/next/reference/loki-http-api/ (Accessed 7 November 2026).
+Grafana Labs, n.d. Loki HTTP API. [online] Available at: <https://grafana.com/docs/loki/next/reference/loki-http-api/> [Accessed 4 November 2026].
 
-OWASP Foundation (2021) *OWASP Top 10:2021*. Available at: https://top10.owasp.org/2021/A00_2021_Introduction/index.html (Accessed 7 November 2026).
+OWASP Foundation, n.d. Logging Cheat Sheet. [online] Available at: <https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html> [Accessed 4 November 2026].
 
-OWASP Foundation (n.d.) *Logging Cheat Sheet*. Available at: https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html (Accessed 7 November 2026).
+OWASP Foundation, 2021. OWASP Top 10:2021. [online] Available at: <https://top10.owasp.org/2021/A00_2021_Introduction/index.html> [Accessed 7 November 2026].
 
-Playwright (n.d.) *Installation*. Available at: https://playwright.dev/docs/intro (Accessed 7 November 2026).
+Playwright, n.d. Installation. [online] Available at: <https://playwright.dev/docs/intro> [Accessed 7 November 2026].
 
-SARS (n.d.) *Rates of tax for individuals*. Available at: https://www.sars.gov.za/tax-rates/income-tax/rates-of-tax-for-individuals/ (Accessed 7 November 2026).
+SonarSource, n.d. Adding analysis to GitHub Actions workflow. [online] Available at: <https://docs.sonarsource.com/sonarqube/latest/devops-platform-integration/github-integration/adding-analysis-to-github-actions-workflow> [Accessed 7 November 2026].
 
-SonarSource (n.d.) *Adding analysis to GitHub Actions workflow*. Available at: https://docs.sonarsource.com/sonarqube/latest/devops-platform-integration/github-integration/adding-analysis-to-github-actions-workflow (Accessed 7 November 2026).
+South African Revenue Service, n.d. Rates of tax for individuals. [online] Available at: <https://www.sars.gov.za/tax-rates/income-tax/rates-of-tax-for-individuals/> [Accessed 7 November 2026].
