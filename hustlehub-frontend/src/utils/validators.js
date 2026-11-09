@@ -3,10 +3,13 @@
 
 export const GIG_CATEGORIES = ['Design', 'Development', 'Writing', 'Marketing', 'Tutoring', 'Photography', 'Other'];
 
+// One "@", then a domain with at least one dot, and no spaces. Written so every character can only match one way (no slow backtracking).
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+\.[^\s@]+$/;
+
 export function validateLogin({ email, password }) {
   const errors = {};
   if (!email.trim()) errors.email = 'Enter your email address.';
-  else if (!/^\S+@\S+\.\S+$/.test(email.trim())) errors.email = 'Enter a valid email address.';
+  else if (!EMAIL_PATTERN.test(email.trim())) errors.email = 'Enter a valid email address.';
   if (!password) errors.password = 'Enter your password.';
   return errors;
 }
@@ -17,7 +20,7 @@ export function validateRegister({ username, email, password, role }) {
   else if (!/^[a-zA-Z0-9_]{3,30}$/.test(username.trim())) errors.username = 'Use 3 to 30 letters, numbers or underscores.';
 
   if (!email.trim()) errors.email = 'Enter your email address.';
-  else if (!/^\S+@\S+\.\S+$/.test(email.trim())) errors.email = 'Enter a valid email address.';
+  else if (!EMAIL_PATTERN.test(email.trim())) errors.email = 'Enter a valid email address.';
 
   if (password.length < 8) errors.password = 'Use at least 8 characters.';
   else if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^a-zA-Z0-9]/.test(password)) {

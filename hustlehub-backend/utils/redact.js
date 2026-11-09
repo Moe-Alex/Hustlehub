@@ -18,7 +18,7 @@ function maskEmail(email) {
 // Replaces credentials embedded in text, such as "mongodb+srv://user:pass@host" or "Bearer eyJ...".
 function scrubText(text) {
   return text
-    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, '$1[REDACTED]@')
+    .replace(/([a-z][a-z0-9+.-]{0,30}:\/\/)[^\s/@:]+:[^\s/@]+@/gi, '$1[REDACTED]@')
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
     .slice(0, MAX_TEXT);
 }

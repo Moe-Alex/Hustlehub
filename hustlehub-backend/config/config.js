@@ -18,7 +18,7 @@ if (process.env.JWT_SECRET.length < 32) {
 }
 
 const toInt = (value, fallback) => {
-  const parsed = parseInt(value, 10);
+  const parsed = Number.parseInt(value, 10);
   return Number.isNaN(parsed) ? fallback : parsed;
 };
 

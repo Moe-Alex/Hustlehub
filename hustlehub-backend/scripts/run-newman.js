@@ -73,7 +73,7 @@ function runNewman() {
     '--reporter-htmlextra-title', 'HustleHub+ API test report',
     '--reporter-json-export', 'newman/reports/newman-report.json',
   ];
-  return spawnSync('npx', args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+  return spawnSync('npx', args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' }); // NOSONAR - dev-only test runner: npx is looked up on the developer's own PATH and this script is not part of the deployed app
 }
 
 // Reads the JSON report and prints one clear line, so the result is easy to quote in evidence.
