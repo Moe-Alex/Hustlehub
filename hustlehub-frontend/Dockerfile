@@ -11,7 +11,7 @@ RUN npm run build
 
 # ---- Stage 2: serve it (this image runs nginx as an unprivileged user) ----
 # Current stable nginx on the current Alpine release. The old 1.27 image (Alpine 3.21) had dozens of known OS vulnerabilities.
-FROM nginxinc/nginx-unprivileged:1.30-alpine3.24
+FROM nginxinc/nginx-unprivileged:1.31-alpine3.24
 
 USER root
 # apk upgrade installs any security fixes released since the base image was built.
