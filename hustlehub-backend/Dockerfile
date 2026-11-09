@@ -1,6 +1,6 @@
 # HustleHub+ API image. Build:  docker build -t hustlehub-api ./hustlehub-backend
 # Runs as the unprivileged "node" user, installs production dependencies only, and checks its own health.
-FROM node:22-alpine
+FROM node:26-alpine
 
 # openssl is only used to create a self-signed certificate on first start (see docker-entrypoint.sh).
 RUN apk add --no-cache openssl
