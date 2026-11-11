@@ -314,7 +314,7 @@ jobs:
           sed -i 's#^SF:#SF:hustlehub-frontend/#' hustlehub-frontend/coverage/lcov.info
 
       - name: SonarQube scan (fails the job if the quality gate fails)
-        uses: SonarSource/sonarqube-scan-action@v7
+        uses: SonarSource/sonarqube-scan-action@v8
         with:
           args: >
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
